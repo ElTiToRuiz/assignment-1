@@ -1,0 +1,3 @@
+algorithm,greedy path length,online return (last 100 ep),greedy-policy regret (median seed),seeds with optimal greedy policy
+SARSA,17,-25.77,3.458,0/20
+Q-learning,13,-51.89,0.0,20/20
