@@ -16,7 +16,18 @@ Short answers to the questions most likely to come up. Each one is linked to thi
 - **BOE** (characterises the optimum):
   Q*(s,a) = Σ_{s',r} p(s',r|s,a) [ r + γ max_{a'} Q*(s',a') ]
 - **Policy iteration** applies the BE (evaluation), then improves greedily. **Value iteration** applies the BOE directly.
-- Both need the **model** P. Here, `tabular_rl/dp.py` uses value iteration only to compute the *ground truth* Q* for the metrics; the agents never see P.
+- Both need the **model** P. We implement both in `tabular_rl/dp.py`, and a test checks that they give the same V*. Number of sweeps to converge:
+
+  | | Value iteration (tol 1e-8) | Policy iteration |
+  |---|---|---|
+  | Deterministic grid | 6 | 6 |
+  | Slippery grid | **145** | **7** |
+  | Cliff Walking | 15 | 15 |
+
+  This matches the comparison table from class:
+  - **value iteration** converges only asymptotically; each sweep is cheap, but it needs many of them;
+  - **policy iteration** converges exactly in a few steps; each step is expensive, because it solves a linear system.
+- Here, `tabular_rl/dp.py` uses value iteration only to compute the *ground truth* Q* for the metrics; the agents never see P.
 
 ## 3. Model-free: Monte Carlo vs TD
 | | Monte Carlo | TD (SARSA / Q-learning) |
@@ -39,6 +50,11 @@ This works like a gradient step: it moves the estimate towards the Bellman targe
 - It is a sample of the **Bellman equation** for the ε-greedy policy, so it learns Q^{π_ε}: the value of the policy *including its exploration*.
 - Code: `tabular_rl/agents.py::sarsa`. a' is sampled **before** the update and then executed.
 - It converges to Q* only if exploration fades out (GLIE) and the step sizes satisfy Robbins–Monro (Σα = ∞, Σα² < ∞).
+- **We verified this (`exp1`).** In the slippery world, with the default schedule (ε_min = 0.05, constant α), SARSA reaches π* in only 15/20 seeds:
+  - its greedy action is wrong in states 6 and 11, next to the pit;
+  - it rarely visits those states, and it learns Q of the ε-greedy policy.
+
+  With ε → 0 and α(s,a) = 0.5 / (1 + 0.005·N(s,a)) it reaches π* in **20/20** seeds. The cost: it needs about 15× more episodes than Q-learning.
 
 ## 6. Q-learning (off-policy TD control)
 - Target: r + γ max_{a'} Q(s', a'), a sample of the **BOE**. It learns Q* directly, whatever policy collected the data.
@@ -99,3 +115,17 @@ This works like a gradient step: it moves the estimate towards the Bellman targe
 ## 15. Hyper-parameter tuning (Optuna)
 - The TPE sampler proposes (α, ε_0, ε_min, decay). The objective is the area under the regret curve (speed of learning) on 5 tuning seeds.
 - We re-evaluated on 20 **held-out** seeds to check for over-fitting to the tuning seeds. See the README table for the honest result.
+
+## 16. What goes beyond the class slides, and how it relates to them
+The assignment asks for "improvements/optimizations of seen algorithms". Each extra is a small change to something from class:
+
+| Extra | Explanation in class notation |
+|---|---|
+| **Expected SARSA** | SARSA, with the sampled q(s',a') replaced by its expectation Σ_{a'} π(a'\|s') q(s',a'). That is Bellman equation (3) from slides 1.3 inside the TD target. Same fixed point as SARSA, lower variance. |
+| **Double Q-learning** | Q-learning, where the max in the BOE target over *noisy* estimates overestimates (E[max] ≥ max E). Two tables: one chooses argmax, the other evaluates it. |
+| **Decaying α(s,a)** | α / (1 + k·N(s,a)) satisfies Robbins–Monro. The MC "online mean" from slides 1.5 is the case α = 1/N. |
+| **GLIE** | The ε-greedy policy from slides 1.5/1.6 with ε → 0, so that it is greedy in the limit while every (s,a) is still visited infinitely often. |
+| **Regret** | V*(s0) − V^π(s0), where V* = max_π V_π from slides 1.2. V^π is computed exactly by solving the Bellman equation (I − γP_π)V = r_π. |
+| **Median / IQR** | Plot statistics only: the band between the 25th and 75th percentile over the 20 seeds. It is robust to the few seeds with extreme values. |
+| **TPE (Optuna)** | Optuna's default sampler. It models which hyper-parameters gave good vs bad trials and proposes new ones where the good ones concentrate. |
+| **Held-out seeds** | Same idea as a train/test split: tune on 5 seeds, report on 20 different ones. |

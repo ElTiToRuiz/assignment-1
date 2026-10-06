@@ -38,3 +38,25 @@ def evaluate_policy(spec: EnvSpec, policy, tensors=None):
     idx = np.arange(spec.n_states)
     P_pi, r_pi = T[idx, policy], R[idx, policy]
     return np.linalg.solve(np.eye(spec.n_states) - spec.gamma * P_pi, r_pi)
+
+
+def policy_iteration(spec: EnvSpec):
+    """Policy iteration (class 1.4): exact policy evaluation (Bellman eq.) + greedy improvement,
+    until the policy is stable. Converges in a finite number of iterations.
+
+    Returns Q, V, policy and the number of improvement iterations.
+    """
+    tensors = model_tensors(spec)
+    T, R = tensors
+    policy = np.zeros(spec.n_states, dtype=int)
+    for k in range(1, 1000):
+        V = evaluate_policy(spec, policy, tensors)    # policy evaluation
+        Q = R + spec.gamma * T @ V                    # policy improvement
+        new = Q.argmax(axis=1)
+        # keep the current action on ties, so the loop cannot cycle between equivalent policies
+        stable = Q[np.arange(spec.n_states), policy] >= Q.max(axis=1) - 1e-12
+        new[stable] = policy[stable]
+        if np.array_equal(new, policy):
+            return Q, V, policy, k
+        policy = new
+    raise RuntimeError("policy iteration did not converge")

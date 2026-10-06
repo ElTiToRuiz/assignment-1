@@ -35,16 +35,16 @@ Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `
 | `python -m experiments.demo` | Loads a **saved model** (Q-table) and plays it in the class pygame `GridworldEnv` |
 | `python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3` | Same, in the terminal |
 | `python docs/make_slides.py` | Builds `docs/presentation.pptx` from the figures |
-| `pytest -q` | Runs the tests (DP ground truth, env equivalence, convergence, Expected SARSA = Q-learning at ε=0, cache) |
+| `pytest -q` | Runs the tests (DP ground truth, policy iteration = value iteration, env equivalence, convergence, Expected SARSA = Q-learning at ε=0, cache) |
 
 ## Repository layout
 
 ```
-class_code/          env.py + tools.py from class (GridworldEnv, unchanged apart from a guarded import)
+class_code/          env.py + tools.py from class (GridworldEnv)
 tabular_rl/
   envs.py            EnvSpec (the env.P format from class), gridworld + Cliff Walking, fast Simulator
   agents.py          Monte Carlo, SARSA, n-step SARSA, Expected SARSA, Q-learning, Double Q-learning
-  dp.py              value iteration (ground truth Q*) and exact policy evaluation (for metrics)
+  dp.py              value iteration (ground truth Q*), policy iteration, exact policy evaluation (for metrics)
   runner.py          multi-seed training, metrics, disk cache, model save/load
   viz.py             plot style and helpers
 experiments/         exp1 ... exp5, run_all.py, demo.py
@@ -79,6 +79,7 @@ Default hyper-parameters:
 | Gridworld deterministic | 3000 | 0.1 | (1.0, 0.05, 0.995) |
 | Gridworld slippery | 10000 | 0.1 | (1.0, 0.05, 0.9995) |
 | Cliff Walking | 1000 | 0.5 | (0.1, 0.1, 1.0), i.e. constant 0.1 |
+| Gridworld slippery, convergent schedule (exp1 only) | 30000 | 0.5 / (1 + 0.005·N(s,a)) | (1.0, 0.0, 0.9998) |
 
 ---
 
@@ -95,6 +96,8 @@ Default hyper-parameters:
 | Deterministic | Q-learning | 0.993 | 0.204 | 94.4 | 0.0000 | 20/20 |
 | Slippery | SARSA | 0.979 | 0.374 | 85.0 | 0.0512 | 15/20 |
 | Slippery | Q-learning | 0.987 | **0.011** | **97.8** | **0.0039** | **19/20** |
+| Slippery, convergent schedule | SARSA | 0.999 | 0.244 | 88.9 | **0.0000** | **20/20** |
+| Slippery, convergent schedule | Q-learning | 1.000 | **0.008** | **99.4** | **0.0000** | **20/20** |
 
 **Deterministic.** Both algorithms find the optimal path (up, up, right, right, right) in every seed.
 
@@ -103,6 +106,21 @@ Default hyper-parameters:
 - in state 11, push DOWN into the wall, so a slip can never take the agent into the pit.
 
 Q-learning recovers Q\* almost exactly. SARSA learns the value of its own ε-greedy policy, so its values next to the pit are lower. That is the expected on-policy behaviour (Bellman equation vs BOE), not an error.
+
+**Why SARSA misses π\* in 5 seeds with the default schedule, and the fix.** With ε_min = 0.05 and a constant α:
+- SARSA learns Q of the ε-greedy policy, not Q\*;
+- the states next to the pit (6 and 11) are rarely visited, so their Q values stay noisy and the greedy action there can be wrong.
+
+The theory gives two conditions for SARSA to converge to the optimum:
+- **GLIE** exploration: every pair (s,a) visited infinitely often and ε → 0;
+- a **Robbins-Monro** step size: Σα = ∞, Σα² < ∞.
+
+The "convergent schedule" meets both:
+- ε decays to 0 (ε_0 = 1, decay = 0.9998);
+- α(s,a) = 0.5 / (1 + 0.005·N(s,a)), where N(s,a) is the visit count (`agents.step_size`);
+- 30 000 episodes.
+
+With it, **both algorithms reach the optimal policy in 20/20 seeds**. SARSA still needs about 15× more episodes than Q-learning to settle (median 13 510 vs 900), which is the cost of learning on-policy.
 
 RMSE over *all* actions stays high in the deterministic world. Once the agent has found the path, it rarely visits bad actions or far states again (`exp5d`). That is why we report the error on the optimal actions.
 
@@ -146,6 +164,11 @@ This is the classic result. Q-learning learns the optimal path but keeps falling
 - Tuning more than halves the regret for both algorithms.
 - The main gain is a much lower ε_min: less random behaviour at the end.
 - SARSA prefers a small α. Its target is noisier because it depends on the sampled a'.
+- **Lower regret does not mean more seeds with π\* (SARSA: 7/20 → 5/20).** The objective is the mean regret *over training*, which rewards fast learning. The tuned SARSA:
+  - with α = 0.0155, gets close to π\* quickly but makes small updates;
+  - therefore, in the states next to the pit, it often stays on an almost-tied, slightly worse action.
+
+  The regret is small but not 0. The objective decides what "better" means; tuning on "seeds with π\*" would trade speed for exactness.
 - The gap between the tuning objective (0.0013) and the held-out result (0.0141) shows **over-fitting to the tuning seeds**, which is why we evaluate on separate seeds.
 
 ### 5. Analysis of the training process (`exp5`)
@@ -168,7 +191,7 @@ This is the classic result. Q-learning learns the optimal path but keeps falling
 
 1. SARSA and Q-learning both solve the deterministic and the stochastic gridworld.
 2. Q-learning (BOE) converges to Q\*. SARSA (Bellman equation) converges to the value of the ε-greedy policy, which makes it **safer while exploring** (Cliff Walking).
-3. Stochastic transitions need a smaller or decaying α, more episodes and slower ε decay.
+3. Stochastic transitions need a decaying α and ε → 0 (Robbins–Monro + GLIE) for SARSA and Q-learning to reach π\* in every seed.
 4. TD bootstraps: low variance, biased. MC uses real returns: unbiased, high variance, and episodes must terminate.
 5. Expected SARSA reduces variance. Double Q-learning removes maximisation bias but learns more slowly.
 6. Hyper-parameters matter. Optuna more than halved the regret, but tuning must be validated on held-out seeds.

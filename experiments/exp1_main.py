@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from tabular_rl.envs import make_spec
-from tabular_rl.runner import moving_average
+from tabular_rl.runner import moving_average, train
 from tabular_rl.viz import COLORS, ENV_NAMES, plot_band, plot_value_policy, save, smooth, snap_x
 
-from .common import save_table, summary_row, train_default
+from .common import CONVERGENT_SLIPPERY, N_JOBS, SEEDS, save_table, summary_row, train_default
 
 ENVS = ["gridworld_deterministic", "gridworld_slippery"]
 ALGOS = ["SARSA", "Q-learning"]
@@ -33,6 +33,12 @@ def main():
         axes_c[i, 2].set(title="Regret of the greedy policy (mean)\nV*(s0) − V^π(s0)", ylabel="regret", xscale="log")
         for ax in axes_c[i]:
             ax.set_xlabel("episode"); ax.legend()
+    # Default schedule keeps eps_min = 0.05 and a constant alpha: SARSA then learns Q of the
+    # eps-greedy policy and rarely visits the states next to the pit (6, 11). With GLIE exploration
+    # and a decaying alpha, both algorithms reach the optimal policy in every seed.
+    for a in ALGOS:
+        o = train(a, "gridworld_slippery", SEEDS, n_jobs=N_JOBS, **CONVERGENT_SLIPPERY)
+        rows.append({"env": "Slippery (GLIE + decaying α)", "algorithm": a, **summary_row(o, "gridworld_slippery")})
     fig_p.suptitle("Learned values and greedy policies vs the optimum")
     fig_c.suptitle("SARSA vs Q-learning: learning curves (20 seeds, median/IQR or mean±std)")
     save(fig_p, "exp1_values_policies.png")

@@ -24,6 +24,11 @@ CONFIG = {
     "cliff_walking": dict(n_episodes=1000, alpha=0.5, eps=(0.1, 0.1, 1.0)),
 }
 
+# Schedule that satisfies the convergence conditions on the slippery gridworld (used by exp1):
+# GLIE exploration (eps -> 0) + Robbins-Monro step size alpha / (1 + 0.005 * N(s,a)).
+# Only for SARSA / Q-learning / Expected SARSA (the agents that accept alpha_decay).
+CONVERGENT_SLIPPERY = dict(n_episodes=30000, alpha=0.5, eps=(1.0, 0.0, 0.9998), alpha_decay=0.005)
+
 
 def train_default(algo, env_name):
     """Train (or load from cache) `algo` on `env_name` with the default config and 20 seeds."""

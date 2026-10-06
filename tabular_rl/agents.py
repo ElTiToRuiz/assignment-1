@@ -60,11 +60,21 @@ def epsilon_at(ep: int, eps: tuple) -> float:
     return max(eps_min, eps_start * eps_decay ** ep)
 
 
+def step_size(alpha: float, alpha_decay: float, n_visits: int) -> float:
+    """alpha_t(s,a) = alpha / (1 + alpha_decay * N(s,a)). alpha_decay=0 -> constant alpha.
+
+    With alpha_decay > 0 the step size satisfies the Robbins-Monro conditions
+    (sum alpha = inf, sum alpha^2 < inf), needed for exact convergence under stochastic transitions.
+    """
+    return alpha / (1.0 + alpha_decay * n_visits)
+
+
 def _setup(spec, seed, n_episodes, log_every):
     return Simulator(spec, seed), random.Random(seed + 10_000), _Recorder(spec, n_episodes, log_every)
 
 
-def sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10) -> RunResult:
+def sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10,
+          alpha_decay=0.0) -> RunResult:
     """On-policy TD control. Target: r + gamma * Q(s', a') with a' ~ e-greedy (same policy that acts)."""
     env, rng, rec = _setup(spec, seed, n_episodes, log_every)
     Q = np.zeros((spec.n_states, spec.n_actions))
@@ -77,7 +87,7 @@ def sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), see
             s2, r, done = env.step(a)
             a2 = epsilon_greedy(Q[s2], e, rng)  # a' chosen BEFORE the update and actually executed next
             target = r + (0.0 if done else spec.gamma * Q[s2, a2])
-            Q[s, a] += alpha * (target - Q[s, a])
+            Q[s, a] += step_size(alpha, alpha_decay, rec.visits[s, a]) * (target - Q[s, a])
             rec.visits[s, a] += 1
             G, steps = G + r, steps + 1
             s, a = s2, a2
@@ -87,7 +97,8 @@ def sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), see
     return rec.result(Q)
 
 
-def q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10) -> RunResult:
+def q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10,
+               alpha_decay=0.0) -> RunResult:
     """Off-policy TD control (Bellman optimality). Target: r + gamma * max_a' Q(s', a')."""
     env, rng, rec = _setup(spec, seed, n_episodes, log_every)
     Q = np.zeros((spec.n_states, spec.n_actions))
@@ -99,7 +110,7 @@ def q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995)
             a = epsilon_greedy(Q[s], e, rng)  # behaviour policy: e-greedy
             s2, r, done = env.step(a)
             target = r + (0.0 if done else spec.gamma * Q[s2].max())  # target policy: greedy
-            Q[s, a] += alpha * (target - Q[s, a])
+            Q[s, a] += step_size(alpha, alpha_decay, rec.visits[s, a]) * (target - Q[s, a])
             rec.visits[s, a] += 1
             G, steps = G + r, steps + 1
             s = s2
@@ -109,7 +120,8 @@ def q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995)
     return rec.result(Q)
 
 
-def expected_sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10) -> RunResult:
+def expected_sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10,
+                   alpha_decay=0.0) -> RunResult:
     """Like SARSA but replaces Q(s',a') by its expectation under the e-greedy policy (lower variance)."""
     env, rng, rec = _setup(spec, seed, n_episodes, log_every)
     Q = np.zeros((spec.n_states, spec.n_actions))
@@ -127,7 +139,7 @@ def expected_sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.
                 best = Q[s2] == Q[s2].max()
                 pi = e / nA + (1 - e) * best / best.sum()  # e-greedy action probabilities in s'
                 target = r + spec.gamma * pi @ Q[s2]
-            Q[s, a] += alpha * (target - Q[s, a])
+            Q[s, a] += step_size(alpha, alpha_decay, rec.visits[s, a]) * (target - Q[s, a])
             rec.visits[s, a] += 1
             G, steps = G + r, steps + 1
             s = s2

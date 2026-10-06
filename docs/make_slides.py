@@ -84,7 +84,9 @@ def main():
         "SARSA (on-policy, Bellman eq.):  Q ← Q + α[r + γ Q(s',a') − Q]",
         "Q-learning (off-policy, BOE):  Q ← Q + α[r + γ max Q(s',·) − Q]",
         "Deterministic: π* in all 20 seeds (Q-learning stable after ~10 episodes, SARSA ~200)",
-        "Slippery: Q-learning reaches Q* more accurately; SARSA learns Q of the ε-greedy policy (lower values near the pit)",
+        "Slippery, default schedule (ε_min = 0.05, constant α): Q-learning 19/20 seeds optimal, SARSA 15/20",
+        "SARSA learns Q of the ε-greedy policy and rarely visits the states next to the pit",
+        "Theory fix: GLIE (ε → 0) + Robbins–Monro α(s,a) = α/(1+k·N) → both 20/20 seeds optimal",
     ], "exp1_learning_curves.png", split=0.3)
 
     # 4. all algorithms
@@ -114,6 +116,7 @@ def main():
         "Held-out (20 new seeds): mean regret SARSA 0.036 → 0.014, Q-learning 0.015 → 0.007",
         "Q-learning tuned: 19/20 seeds optimal (default 7/20)",
         "Over-fitting is visible: SARSA objective 0.001 on tuning seeds but 0.014 held-out",
+        "Lower regret ≠ more exact: tuned SARSA learns faster, but only 5/20 seeds reach exactly π*",
     ], "exp4_optuna.png", split=0.28)
 
     # 8. conclusions
@@ -121,11 +124,33 @@ def main():
     add_text(s, [
         "• SARSA and Q-learning both solve the deterministic and the stochastic gridworld",
         "• Q-learning (BOE) → Q*; SARSA (BE) → Q of the ε-greedy policy: safer behaviour while exploring",
-        "• Stochastic transitions need smaller/decaying α, more episodes and slower ε decay",
+        "• Stochastic transitions need decaying α and ε → 0 (Robbins–Monro + GLIE) to reach π* in every seed",
         "• TD bootstraps (low variance, biased); MC uses real returns (unbiased, high variance, needs episodes to end)",
         "• Expected SARSA lowers variance; Double Q removes maximisation bias but learns more slowly",
         "• Everything is reproducible: results cached; `python -m experiments.run_all` redraws without training",
     ], Inches(0.7), Inches(1.4), Inches(12), Inches(5.5), size=20)
+
+    # 9-10. backup slides for the questions (not part of the 5-minute talk)
+    s = slide(prs, "Backup: dynamic programming (model-based)", "Used only as ground truth; agents never see P")
+    add_text(s, [
+        "• Value iteration: apply the BOE  V(s) ← max_a Σ p(s'|s,a)[r + γV(s')]  until Δ < θ",
+        "• Policy iteration: evaluate π exactly (Bellman eq. → linear system), then improve greedily",
+        "• Both give the same V* (unit test). Number of sweeps:",
+        "      Deterministic grid:  VI 6   ·  PI 6",
+        "      Slippery grid:        VI 145  ·  PI 7",
+        "      Cliff Walking:         VI 15  ·  PI 15",
+        "• VI: cheap sweeps, asymptotic convergence · PI: expensive steps, exact in a few iterations",
+    ], Inches(0.7), Inches(1.5), Inches(12), Inches(5.5), size=20)
+
+    s = slide(prs, "Backup: extras beyond the class slides", "Each one is a small change to an algorithm seen in class")
+    add_text(s, [
+        "• Expected SARSA: target r + γ Σ π(a'|s') Q(s',a')  (Bellman eq. (3) inside the TD target, lower variance)",
+        "• Double Q-learning: two tables, one picks argmax, the other evaluates it  (removes the max over-estimation)",
+        "• n-step SARSA: n = 1 → SARSA, n → ∞ → Monte Carlo",
+        "• Regret = V*(s0) − V^π(s0), computed exactly with the model",
+        "• α(s,a) = α/(1+k·N(s,a)): Robbins–Monro; MC's online mean is the case α = 1/N",
+        "• Optuna TPE: proposes hyper-parameters where the good trials concentrate; report on held-out seeds",
+    ], Inches(0.7), Inches(1.5), Inches(12), Inches(5.5), size=20)
 
     prs.save(OUT)
     print(f"saved {OUT}")

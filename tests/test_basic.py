@@ -3,7 +3,7 @@ import numpy as np
 from class_code.env import GridworldEnv
 from tabular_rl import runner
 from tabular_rl.agents import ALGORITHMS, expected_sarsa, q_learning
-from tabular_rl.dp import evaluate_policy, value_iteration
+from tabular_rl.dp import evaluate_policy, policy_iteration, value_iteration
 from tabular_rl.envs import Simulator, greedy_path, make_spec
 from tabular_rl.runner import run_many
 
@@ -58,3 +58,13 @@ def test_cache_and_model_roundtrip(tmp_path, monkeypatch):
     assert np.allclose(a["Q"], b["Q"], atol=1e-6)
     runner.save_model("gridworld_deterministic", "SARSA", a["Q"].mean(0))
     assert np.allclose(runner.load_model("gridworld_deterministic", "SARSA"), a["Q"].mean(0))
+
+
+def test_policy_iteration_matches_value_iteration():
+    for env_name in ["gridworld_deterministic", "gridworld_slippery", "cliff_walking"]:
+        spec = make_spec(env_name)
+        Q_vi, V_vi, _ = value_iteration(spec)
+        _, V_pi, pi, k = policy_iteration(spec)
+        assert np.allclose(V_pi, V_vi, atol=1e-8)
+        assert np.allclose(evaluate_policy(spec, pi), V_vi, atol=1e-8)  # PI's policy is optimal
+        print(env_name, "policy iteration steps:", k)
