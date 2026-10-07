@@ -113,8 +113,15 @@ This works like a gradient step: it moves the estimate towards the Bellman targe
 - 20 seeds per configuration. We plot median + IQR for noisy curves and mean ± std for errors.
 
 ## 15. Hyper-parameter tuning (Optuna)
-- The TPE sampler proposes (α, ε_0, ε_min, decay). The objective is the area under the regret curve (speed of learning) on 5 tuning seeds.
-- We re-evaluated on 20 **held-out** seeds to check for over-fitting to the tuning seeds. See the README table for the honest result.
+- **TPE (Tree-structured Parzen Estimator):** Bayesian optimisation. It splits past trials into good and bad, models the density of each, and proposes points where good / bad is high.
+- **Preliminary study** (single objective = area under the regret curve): lower mean regret, but tuned SARSA reached exactly π* in fewer seeds. The objective defines what "better" means.
+- **Full study** (`experiments/tune.py`) is **multi-objective**: speed (mean regret during training) and exactness (final regret). Result: a **Pareto front**, i.e. configurations where neither objective can improve without worsening the other. We pick the point with the lowest sum.
+- **Search space:** α, an optional Robbins–Monro decay α/(1+k·N), the ε schedule (start, minimum, half-life) and n.
+- **Over-fitting:** tune on 5 seeds, report on 20 different **held-out** seeds, like a train/test split.
+- **Statistics:**
+  - **bootstrap CI**: resample the 20 seed results with replacement 10 000 times and take the 2.5–97.5 percentiles of the mean;
+  - **permutation test**: under H0 (default and tuned equally good) the labels are exchangeable, so shuffle them and count how often the difference is at least as large as the observed one.
+- **PED-ANOVA importance:** which hyper-parameters separate the good trials from the rest.
 
 ## 16. What goes beyond the class slides, and how it relates to them
 The assignment asks for "improvements/optimizations of seen algorithms". Each extra is a small change to something from class:

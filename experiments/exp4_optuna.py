@@ -1,105 +1,210 @@
-"""Extra: hyper-parameter tuning with Optuna (TPE sampler) for SARSA and Q-learning (slippery gridworld).
+"""Extra: analysis of the Optuna studies produced by `python -m experiments.tune`.
 
-Objective (minimise): mean regret of the greedy policy over the whole training run, i.e. the area
-under the regret curve. It rewards learning *fast*, not only learning eventually. Averaged over 5
-tuning seeds; budget fixed to 3000 episodes so the hyper-parameters matter.
-The final comparison (default vs tuned) uses 20 *different* seeds to detect over-fitting.
-The study is cached (results/cache/exp4_*.json + tables/exp4_trials_*.csv).
+For every (environment, algorithm) study it:
+  1. plots all trials in the (speed, exactness) plane with the Pareto front and the chosen trial;
+  2. re-trains the default and the tuned configuration on 20 held-out seeds (cached) and compares
+     them with bootstrap 95% confidence intervals and a permutation test;
+  3. estimates which hyper-parameters matter (PED-ANOVA importance).
+The studies themselves are never re-run here, so this is fast once the cache exists.
+Set RL_OPTUNA_DB=<file> to read another database.
 """
 import json
+import os
+from pathlib import Path
+
+import warnings
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import NullFormatter
 import numpy as np
 import optuna
 import pandas as pd
 
-from tabular_rl import runner
 from tabular_rl.envs import make_spec
-from tabular_rl.runner import CACHE_DIR, run_many, train
-from tabular_rl.viz import COLORS, save, smooth, snap_x
+from tabular_rl.runner import train
+from tabular_rl.stats import bootstrap_ci, permutation_test
+from tabular_rl.viz import COLORS, ENV_NAMES, save
 
-from .common import N_JOBS, SEEDS, TABLES, save_table
+from .common import N_JOBS, SEEDS, save_table
+from .tune import ALGOS, BUDGET, ENVS, STORAGE, chosen_trial, default_kwargs, storage_url, study_name
 
-ENV, N_EP, N_TRIALS = "gridworld_slippery", 3000, 40
-TUNE_SEEDS = [100, 101, 102, 103, 104]  # disjoint from the evaluation seeds 0..19
-DEFAULT = dict(alpha=0.1, eps=(1.0, 0.05, 0.995))
-ALGOS = ["SARSA", "Q-learning"]
-
-
-def objective_for(algo, spec):
-    def objective(trial):
-        alpha = trial.suggest_float("alpha", 0.01, 1.0, log=True)
-        eps_start = trial.suggest_float("eps_start", 0.2, 1.0)
-        eps_min = trial.suggest_float("eps_min", 0.001, 0.2, log=True)
-        eps_decay = trial.suggest_float("eps_decay", 0.99, 0.9999, log=True)
-        out = run_many(algo, spec, TUNE_SEEDS, n_jobs=len(TUNE_SEEDS), n_episodes=N_EP,
-                       alpha=alpha, eps=(eps_start, eps_min, eps_decay))
-        return float(out["regret"].mean())
-    return objective
+PARAMS = ["alpha", "use_alpha_decay", "alpha_decay", "eps_start", "eps_min", "eps_halflife", "n"]
 
 
-def tune(algo, spec):
-    """Run (or load) the Optuna study. Returns (best_params, trials dataframe)."""
-    best_path = CACHE_DIR / f"exp4_best_{runner.slug(algo)}.json"
-    trials_path = TABLES / f"exp4_trials_{runner.slug(algo)}.csv"
-    if best_path.exists() and trials_path.exists() and not runner.RETRAIN:
-        return json.loads(best_path.read_text()), pd.read_csv(trials_path)
-    print(f"  [optuna] tuning {algo}: {N_TRIALS} trials x {len(TUNE_SEEDS)} seeds ...", flush=True)
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
-    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=0))
-    study.enqueue_trial(dict(alpha=0.1, eps_start=1.0, eps_min=0.05, eps_decay=0.995))  # default = trial 0
-    study.optimize(objective_for(algo, spec), n_trials=N_TRIALS)
-    best = {**study.best_params, "objective": study.best_value}
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    best_path.write_text(json.dumps(best, indent=2))
-    df = study.trials_dataframe()
-    save_table(df, f"exp4_trials_{runner.slug(algo)}")
-    return best, df
+def load(storage_path):
+    if not Path(storage_path).exists():
+        return {}
+    storage = storage_url(storage_path)
+    names = set(optuna.get_all_study_names(storage))
+    studies = {}
+    for env in ENVS:
+        for algo in ALGOS:
+            if study_name(env, algo) in names:
+                st = optuna.load_study(study_name=study_name(env, algo), storage=storage)
+                if any(t.state == optuna.trial.TrialState.COMPLETE for t in st.trials):
+                    studies[(env, algo)] = st
+    return studies
+
+
+def tuned_kwargs(study):
+    kw = json.loads(chosen_trial(study).user_attrs["kwargs"])
+    kw["eps"] = tuple(kw["eps"])
+    return kw
+
+
+def held_out(env, algo, kw, n_episodes):
+    """Normalised regret per held-out seed: (speed, exactness, exactly optimal at the end)."""
+    out = train(algo, env, SEEDS, n_jobs=N_JOBS, n_episodes=n_episodes, **kw)
+    norm = abs(out["V_star"][make_spec(env).start_state])
+    reg = np.clip(out["regret"], 0, None) / norm
+    return reg.mean(1), reg[:, -10:].mean(1), out["regret"][:, -1] < 1e-9
+
+
+def pareto_figure(studies, envs, algos):
+    fig, axes = plt.subplots(len(envs), len(algos), figsize=(3.3 * len(algos), 3.2 * len(envs)),
+                             layout="constrained", squeeze=False)
+    for i, env in enumerate(envs):
+        for j, algo in enumerate(algos):
+            ax = axes[i, j]
+            st = studies.get((env, algo))
+            if st is None:
+                ax.axis("off"); continue
+            done = [t for t in st.trials if t.state == optuna.trial.TrialState.COMPLETE]
+            v = np.array([t.values for t in done]) + 1e-5  # log axes: shift exact zeros
+            front = {t.number for t in st.best_trials}
+            on = np.array([t.number in front for t in done])
+            ax.scatter(v[~on, 0], v[~on, 1], s=12, color="lightgray", label="trial")
+            ax.scatter(v[on, 0], v[on, 1], s=22, color=COLORS[algo] if algo in COLORS else "C0", label="Pareto front")
+            c = chosen_trial(st)
+            ax.scatter(*(np.array(c.values) + 1e-5), marker="*", s=180, color="gold", edgecolor="black", label="chosen")
+            d = [t for t in done if t.number == 0]
+            if d:
+                ax.scatter(*(np.array(d[0].values) + 1e-5), marker="s", s=70, facecolor="none", edgecolor="black",
+                           lw=1.5, label="default", zorder=5)
+            ax.set(xscale="log", yscale="log", title=f"{algo}\n{ENV_NAMES[env]}")
+            for axis in (ax.xaxis, ax.yaxis):
+                axis.set_minor_formatter(NullFormatter())
+            if i == len(envs) - 1:
+                ax.set_xlabel("speed: mean regret")
+            if j == 0:
+                ax.set_ylabel("exactness: final regret")
+    axes[0, 0].legend(fontsize=7, loc="lower right")
+    fig.suptitle("Optuna multi-objective search (TPE): every trial, Pareto front, default and chosen configuration")
+    save(fig, "exp4_pareto.png")
+
+
+def comparison(studies, envs, algos):
+    rows, res = [], {}
+    for env in envs:
+        for algo in algos:
+            st = studies.get((env, algo))
+            if st is None:
+                continue
+            tuned = tuned_kwargs(st)
+            d = held_out(env, algo, default_kwargs(env, algo), BUDGET[env])
+            t = held_out(env, algo, tuned, BUDGET[env])
+            res[(env, algo)] = (d, t)
+            for tag, (sp, ex, opt), cfg in [("default", d, default_kwargs(env, algo)), ("tuned", t, tuned)]:
+                lo, hi = bootstrap_ci(sp)
+                rows.append({"env": ENV_NAMES[env], "algorithm": algo, "config": tag,
+                             "hyper-parameters": json.dumps({k: (round(v, 4) if isinstance(v, float) else
+                                                                 [round(x, 4) for x in v] if isinstance(v, tuple) else v)
+                                                             for k, v in cfg.items()}),
+                             "speed (mean regret)": round(float(sp.mean()), 4),
+                             "95% CI": f"[{lo:.4f}, {hi:.4f}]",
+                             "exactness (final regret)": round(float(ex.mean()), 4),
+                             "seeds exactly optimal": f"{int(opt.sum())}/{len(opt)}",
+                             "p-value speed (vs default)": "" if tag == "default" else f"{permutation_test(d[0], t[0]):.4f}",
+                             "p-value exactness (vs default)": "" if tag == "default" else f"{permutation_test(d[1], t[1]):.4f}"})
+    save_table(pd.DataFrame(rows), "exp4_default_vs_tuned")
+
+    fig, axes = plt.subplots(2, len(envs), figsize=(8 * len(envs), 8.5), layout="constrained", squeeze=False)
+    w = 0.38
+    for i, env in enumerate(envs):
+        al = [a for a in algos if (env, a) in res]
+        for k, metric in enumerate(["speed (mean regret)", "seeds exactly optimal (%)"]):
+            ax = axes[k, i]
+            for j, a in enumerate(al):
+                d, t = res[(env, a)]
+                for off, tag, vals, hatch in [(-w / 2, "default", d, "//"), (w / 2, "tuned", t, None)]:
+                    if k == 0:
+                        m = vals[0].mean(); lo, hi = bootstrap_ci(vals[0])
+                        ax.bar(j + off, max(m, 1e-5), w, color=COLORS.get(a, "C0"), alpha=.45 if tag == "default" else 1,
+                               hatch=hatch, edgecolor="black", lw=.5, yerr=[[max(m - lo, 0)], [hi - m]], capsize=2,
+                               label=tag if j == 0 else None)
+                    else:
+                        ax.bar(j + off, 100 * vals[2].mean(), w, color=COLORS.get(a, "C0"), alpha=.45 if tag == "default" else 1,
+                               hatch=hatch, edgecolor="black", lw=.5, label=tag if j == 0 else None)
+                if k == 0:
+                    p = permutation_test(d[0], t[0])
+                    star = "***" if p < 1e-3 else "**" if p < 1e-2 else "*" if p < 0.05 else "n.s."
+                    top = max(d[0].mean() + (bootstrap_ci(d[0])[1] - d[0].mean()), bootstrap_ci(t[0])[1], 1e-5)
+                    ax.text(j, top * 1.25, star, ha="center", va="bottom", fontsize=9)
+            ax.set_xticks(range(len(al)), [a.replace(" ", "\n", 1) for a in al], fontsize=9)
+            ax.grid(axis="x", visible=False)
+            if k == 0:
+                ax.set_yscale("log")
+                lo_, hi_ = ax.get_ylim()
+                ax.set_ylim(lo_, hi_ * 4)  # room for the significance marks
+                ax.set(title=f"{ENV_NAMES[env]}: mean regret on 20 held-out seeds (95% CI)",
+                       ylabel="normalised regret (lower = faster)")
+            else:
+                ax.set(ylim=(0, 105), title="Seeds whose final greedy policy is exactly π*", ylabel="% of seeds")
+            ax.legend(loc="upper left")
+    fig.suptitle("Default vs Optuna-tuned hyper-parameters (permutation test: * p<0.05, ** p<0.01, *** p<0.001)")
+    save(fig, "exp4_default_vs_tuned.png")
+
+
+def importance_figure(studies, envs, algos):
+    fig, axes = plt.subplots(1, len(envs), figsize=(7 * len(envs), 0.6 * len(algos) + 2.2), layout="constrained", squeeze=False)
+    rows = []
+    for i, env in enumerate(envs):
+        al = [a for a in algos if (env, a) in studies]
+        M = np.full((len(al), len(PARAMS)), np.nan)
+        for j, a in enumerate(al):
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    imp = optuna.importance.get_param_importances(
+                        studies[(env, a)], evaluator=optuna.importance.PedAnovaImportanceEvaluator(),
+                        target=lambda t: sum(t.values))
+            except Exception as e:  # too few trials, constant objective, ...
+                print(f"  [warn] importance {env}/{a}: {e}")
+                continue
+            for k, p in enumerate(PARAMS):
+                if p in imp:
+                    M[j, k] = imp[p]
+                    rows.append({"env": ENV_NAMES[env], "algorithm": a, "parameter": p, "importance": round(imp[p], 3)})
+        ax = axes[0, i]
+        im = ax.imshow(M, cmap="Blues", vmin=0, vmax=max(np.nanmax(M), 1e-9) if np.isfinite(M).any() else 1)
+        for (r, c), val in np.ndenumerate(M):
+            ax.text(c, r, "—" if np.isnan(val) else f"{val:.2f}", ha="center", va="center", fontsize=8)
+        ax.set_xticks(range(len(PARAMS)), PARAMS, rotation=30, ha="right")
+        ax.set_yticks(range(len(al)), al)
+        ax.set_title(ENV_NAMES[env]); ax.grid(False)
+        fig.colorbar(im, ax=ax, shrink=.8)
+    fig.suptitle("Which hyper-parameters matter? (PED-ANOVA importance for speed + exactness)")
+    save(fig, "exp4_param_importance.png")
+    if rows:
+        save_table(pd.DataFrame(rows), "exp4_param_importance")
 
 
 def main():
-    print("exp4: Optuna hyper-parameter tuning")
-    spec = make_spec(ENV)
-    fig, axes = plt.subplots(2, 3, figsize=(17, 9), layout="constrained")
-    rows = []
-    for j, algo in enumerate(ALGOS):
-        best, df = tune(algo, spec)
-        tuned = dict(alpha=best["alpha"], eps=(best["eps_start"], best["eps_min"], best["eps_decay"]))
-        res_cfg = {"default": DEFAULT, "tuned": tuned}
-        res = {tag: train(algo, ENV, SEEDS, n_jobs=N_JOBS, n_episodes=N_EP, **cfg)
-               for tag, cfg in [("default", DEFAULT), ("tuned", tuned)]}
-        for tag, cfg in [("default", DEFAULT), ("tuned", tuned)]:
-            o = res[tag]
-            rows.append({"algorithm": algo, "config": tag, "alpha": round(cfg["alpha"], 4),
-                         "eps (start, min, decay)": tuple(round(v, 4) for v in cfg["eps"]),
-                         "objective on tuning seeds": round(float(df["value"].iloc[0] if tag == "default" else best["objective"]), 4),
-                         "mean regret held-out": round(float(o["regret"].mean()), 4),
-                         "final regret held-out": round(float(o["regret"][:, -1].mean()), 4),
-                         "seeds optimal": f"{int((o['regret'][:, -1] < 1e-9).sum())}/{len(SEEDS)}"})
-        # (1) optimisation history
-        ax = axes[j, 0]
-        ax.scatter(df["number"], df["value"], s=18, color=COLORS[algo], alpha=.6, label="trial")
-        ax.plot(df["number"], df["value"].cummin(), color="black", lw=1.5, label="best so far")
-        ax.axhline(df["value"].iloc[0], ls=":", color="gray", label="default config")
-        ax.set(yscale="log", xlabel="trial", ylabel="objective (mean regret)", title=f"{algo}: Optuna optimisation history")
-        ax.legend()
-        # (2) objective vs alpha, coloured by exploration decay
-        ax = axes[j, 1]
-        sc = ax.scatter(df["params_alpha"], df["value"], c=-np.log10(1 - df["params_eps_decay"]), cmap="viridis", s=28)
-        ax.set(xscale="log", yscale="log", xlabel="alpha", ylabel="objective",
-               title=f"{algo}: objective vs learning rate")
-        fig.colorbar(sc, ax=ax, label="-log10(1 - eps_decay)  (higher = slower decay)")
-        # (3) held-out default vs tuned
-        ax = axes[j, 2]
-        for tag, ls in [("default", "--"), ("tuned", "-")]:
-            o = res[tag]
-            ax.plot(snap_x(o), smooth(o["regret"].mean(0), 10), ls, color=COLORS[algo], lw=2,
-                    label=f"{tag}: α={res_cfg[tag]['alpha']:.3f}, mean regret {o['regret'].mean():.4f}")
-        ax.set(xlabel="episode", ylabel="regret (mean, smoothed)", xscale="log", title=f"{algo}: default vs tuned on 20 held-out seeds")
-        ax.legend()
-    fig.suptitle("Hyper-parameter optimisation with Optuna (slippery gridworld, 3000 episodes)")
-    save(fig, "exp4_optuna.png")
-    save_table(pd.DataFrame(rows), "exp4_default_vs_tuned")
+    print("exp4: Optuna studies")
+    path = os.environ.get("RL_OPTUNA_DB", str(STORAGE))
+    studies = load(path)
+    if not studies:
+        print(f"  no Optuna studies in {path}. Run `python -m experiments.tune` first (ideally on a big machine).")
+        return
+    envs = [e for e in ENVS if any(k[0] == e for k in studies)]
+    algos = [a for a in ALGOS if any(k[1] == a for k in studies)]
+    rows = [{"env": ENV_NAMES[e], "algorithm": a, "trials": len(st.trials), "pareto size": len(st.best_trials),
+             "chosen speed": round(chosen_trial(st).values[0], 4), "chosen exactness": round(chosen_trial(st).values[1], 4),
+             "tuned hyper-parameters": chosen_trial(st).user_attrs["kwargs"]} for (e, a), st in studies.items()]
+    save_table(pd.DataFrame(rows), "exp4_tuned_params")
+    pareto_figure(studies, envs, algos)
+    importance_figure(studies, envs, algos)
+    comparison(studies, envs, algos)
 
 
 if __name__ == "__main__":

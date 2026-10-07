@@ -68,3 +68,26 @@ def test_policy_iteration_matches_value_iteration():
         assert np.allclose(V_pi, V_vi, atol=1e-8)
         assert np.allclose(evaluate_policy(spec, pi), V_vi, atol=1e-8)  # PI's policy is optimal
         print(env_name, "policy iteration steps:", k)
+
+
+def test_stats_helpers():
+    from tabular_rl.stats import bootstrap_ci, permutation_test
+    rng = np.random.default_rng(0)
+    a, b = rng.normal(0, 1, 40), rng.normal(2, 1, 40)
+    lo, hi = bootstrap_ci(a)
+    assert lo < a.mean() < hi
+    assert permutation_test(a, b, n_perm=2000) < 0.01      # clearly different
+    assert permutation_test(a, a.copy(), n_perm=2000) > 0.5  # identical groups
+
+
+def test_tune_default_trial_reproduces_default_config():
+    import optuna
+    from experiments.tune import ALGOS, ENVS, default_kwargs, default_params, suggest
+    for env in ENVS:
+        for algo in ALGOS:
+            trial = optuna.trial.FixedTrial(default_params(env, algo))
+            kw, ref = suggest(trial, env, algo), default_kwargs(env, algo)
+            assert np.isclose(kw["alpha"], ref["alpha"]) and "alpha_decay" not in kw
+            assert np.allclose(kw["eps"][:2], ref["eps"][:2])
+            assert abs(kw["eps"][2] - ref["eps"][2]) < 1e-6 or ref["eps"][2] == 1.0  # constant eps: eps_min = eps_start
+            assert kw.get("n") == ref.get("n")

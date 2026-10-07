@@ -110,14 +110,23 @@ def main():
     picture(s, "exp5b_exploration.png", Inches(0.4), Inches(1.4), W - Inches(0.8), Inches(2.8))
     picture(s, "exp5c_bias_variance.png", Inches(2.2), Inches(4.3), W - Inches(4.4), Inches(3.1))
 
-    # 7. optuna
-    bullets_and_figure(prs, "Hyper-parameter tuning with Optuna", "TPE, 40 trials, objective = area under the regret curve", [
-        "Tuned α and the ε schedule (start, min, decay) on 5 seeds",
-        "Held-out (20 new seeds): mean regret SARSA 0.036 → 0.014, Q-learning 0.015 → 0.007",
-        "Q-learning tuned: 19/20 seeds optimal (default 7/20)",
-        "Over-fitting is visible: SARSA objective 0.001 on tuning seeds but 0.014 held-out",
-        "Lower regret ≠ more exact: tuned SARSA learns faster, but only 5/20 seeds reach exactly π*",
-    ], "exp4_optuna.png", split=0.28)
+    # 7. optuna: full multi-objective study if it has been run (experiments.tune), else the preliminary one
+    if (FIG / "exp4_default_vs_tuned.png").exists():
+        bullets_and_figure(prs, "Hyper-parameter tuning with Optuna", "Multi-objective TPE: speed vs exactness, 6 algorithms x 2 environments", [
+            "Search: α, Robbins–Monro decay of α, ε schedule (start, min, half-life), n for n-step",
+            "Two objectives: mean regret during training (speed) and final regret (exactness) → Pareto front",
+            "Tuned on 5 seeds, compared on 20 held-out seeds",
+            "Bootstrap 95% CI + permutation test (* p<0.05)",
+            "See results/tables/exp4_default_vs_tuned.csv for the numbers",
+        ], "exp4_default_vs_tuned.png", split=0.28)
+    else:
+        bullets_and_figure(prs, "Hyper-parameter tuning with Optuna", "TPE, 40 trials, objective = area under the regret curve", [
+            "Tuned α and the ε schedule (start, min, decay) on 5 seeds",
+            "Held-out (20 new seeds): mean regret SARSA 0.036 → 0.014, Q-learning 0.015 → 0.007",
+            "Q-learning tuned: 19/20 seeds optimal (default 7/20)",
+            "Over-fitting is visible: SARSA objective 0.001 on tuning seeds but 0.014 held-out",
+            "Lower regret ≠ more exact: tuned SARSA learns faster, but only 5/20 seeds reach exactly π*",
+        ], "exp4_preliminary_optuna.png", split=0.28)
 
     # 8. conclusions
     s = slide(prs, "Conclusions")
