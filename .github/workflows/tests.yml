@@ -28,3 +28,7 @@ jobs:
         run: uv run python -m experiments.tune --quick --workers 2 --storage smoke/studies.db --envs cliff_walking --algos SARSA "MC constant-α"
       - name: Demo with a saved model (terminal)
         run: uv run python -m experiments.demo --render ansi --episodes 1
+      - name: Windows batch script (quick mode)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: run_server.bat quick

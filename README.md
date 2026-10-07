@@ -45,7 +45,13 @@ Everything heavy is cached, so the workflow is: train once on a big machine, com
 - the figures can be redrawn from the cache;
 - the Optuna pipeline runs.
 
-**Windows (PowerShell):**
+**Windows without git or admin rights (e.g. a managed university PC):** use `run_server.bat`.
+1. Download the code as a ZIP (<https://github.com/ElTiToRuiz/assignment-1/archive/refs/heads/main.zip>) and extract it.
+2. If `uv` is not installed, download [`uv-x86_64-pc-windows-msvc.zip`](https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip) and put `uv.exe` in a folder `uv\` next to `run_server.bat`. uv then installs Python in the user folder.
+3. Run `run_server.bat quick` (about 1 minute) to check that everything works, then run `run_server.bat`.
+4. It produces `results_upload.zip` with `results/` and `docs/`. Extract it over the repository on a machine with git, then commit and push.
+
+**Windows with git (PowerShell):**
 
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # install uv (once), then reopen the terminal
