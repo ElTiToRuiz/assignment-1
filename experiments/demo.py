@@ -1,8 +1,8 @@
 """Watch a saved agent (no training): loads results/models/<env>__<algo>.npy and runs the greedy policy
 in the class GridworldEnv.
 
-    python -m experiments.demo                                  # Q-learning, deterministic, pygame window
-    python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3
+    uv run python -m experiments.demo                                  # Q-learning, deterministic, pygame window
+    uv run python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3
 """
 import argparse
 import time

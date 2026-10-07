@@ -1,6 +1,6 @@
 """Build docs/presentation.pptx from the saved figures (no training needed).
 
-    python docs/make_slides.py
+    uv run python docs/make_slides.py
 """
 from pathlib import Path
 
@@ -136,7 +136,7 @@ def main():
         "• Stochastic transitions need decaying α and ε → 0 (Robbins–Monro + GLIE) to reach π* in every seed",
         "• TD bootstraps (low variance, biased); MC uses real returns (unbiased, high variance, needs episodes to end)",
         "• Expected SARSA lowers variance; Double Q removes maximisation bias but learns more slowly",
-        "• Everything is reproducible: results cached; `python -m experiments.run_all` redraws without training",
+        "• Everything is reproducible: results cached; `uv run python -m experiments.run_all` redraws without training",
     ], Inches(0.7), Inches(1.4), Inches(12), Inches(5.5), size=20)
 
     # backup: failure analysis

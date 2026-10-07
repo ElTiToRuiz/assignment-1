@@ -1,8 +1,8 @@
 """Run every experiment. Uses the cache in results/cache, so nothing is retrained unless --retrain.
 
-    python -m experiments.run_all                 # plots + tables from cache (seconds)
-    python -m experiments.run_all --retrain       # train everything again (~20-30 min)
-    python -m experiments.run_all --only exp1 exp3
+    uv run python -m experiments.run_all                 # plots + tables from cache (seconds)
+    uv run python -m experiments.run_all --retrain       # train everything again (~20-30 min)
+    uv run python -m experiments.run_all --only exp1 exp3
 """
 import argparse
 import time

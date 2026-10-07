@@ -13,12 +13,12 @@ Studies are stored in SQLite (results/optuna/studies.db). They are **resumable**
 trials until each study has `--trials` finished trials. Several worker processes share the
 database and evaluate trials in parallel.
 
-    python -m experiments.tune                       # all studies, default budget
-    python -m experiments.tune --workers 32 --trials 100
-    python -m experiments.tune --envs cliff_walking --algos SARSA Q-learning
-    python -m experiments.tune --quick --storage /tmp/smoke.db   # 1-minute smoke test
+    uv run python -m experiments.tune                       # all studies, default budget
+    uv run python -m experiments.tune --workers 32 --trials 100
+    uv run python -m experiments.tune --envs cliff_walking --algos SARSA Q-learning
+    uv run python -m experiments.tune --quick --storage /tmp/smoke.db   # 1-minute smoke test
 
-Afterwards `python -m experiments.run_all` evaluates the tuned configurations on 20 held-out seeds.
+Afterwards `uv run python -m experiments.run_all` evaluates the tuned configurations on 20 held-out seeds.
 """
 import argparse
 import json
@@ -169,4 +169,4 @@ if __name__ == "__main__":
     t0 = time.time()
     run(a.envs, a.algos, 4 if a.quick else a.trials, a.workers, a.storage,
         TUNE_SEEDS[:2] if a.quick else TUNE_SEEDS, quick=a.quick)
-    print(f"done in {time.time() - t0:.1f}s. Now run: python -m experiments.run_all")
+    print(f"done in {time.time() - t0:.1f}s. Now run: uv run python -m experiments.run_all")

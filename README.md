@@ -14,14 +14,14 @@ All results are **cached**: the plots and tables are regenerated in a few second
 
 ## Setup
 
-Python ≥ 3.11.
+The project is managed with [uv](https://docs.astral.sh/uv/). Dependencies are in `pyproject.toml`, and the exact versions are pinned in `uv.lock`. Python ≥ 3.11.
 
 ```bash
-# with uv
-uv venv && uv pip install -r requirements.txt
-# or with pip
-python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh   # install uv (once)
+uv sync                                           # creates .venv with the locked versions
 ```
+
+Every command below runs through `uv run`, so there is no need to activate the virtual environment.
 
 Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `python-pptx` (slides), `pytest` (tests).
 
@@ -29,34 +29,35 @@ Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `
 
 | Command | What it does |
 |---|---|
-| `python -m experiments.run_all` | Rebuilds every figure and table **from the cache** (~10 s, no training) |
-| `python -m experiments.run_all --retrain` | Trains everything again from scratch (~13 min on 8 cores) |
-| `python -m experiments.run_all --only exp1 exp3` | Runs only some experiments |
-| `python -m experiments.demo` | Loads a **saved model** (Q-table) and plays it in the class pygame `GridworldEnv` |
-| `python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3` | Same, in the terminal |
-| `python docs/make_slides.py` | Builds `docs/presentation.pptx` from the figures |
-| `python -m experiments.tune` | Optuna hyper-parameter search (multi-objective, resumable, parallel). Heavy: run it on a big machine |
-| `pytest -q` | Runs the tests (DP ground truth, policy iteration = value iteration, env equivalence, convergence, Expected SARSA = Q-learning at ε=0, cache, statistics, search space) |
+| `uv run python -m experiments.run_all` | Rebuilds every figure and table **from the cache** (~10 s, no training) |
+| `uv run python -m experiments.run_all --retrain` | Trains everything again from scratch (~13 min on 8 cores) |
+| `uv run python -m experiments.run_all --only exp1 exp3` | Runs only some experiments |
+| `uv run python -m experiments.demo` | Loads a **saved model** (Q-table) and plays it in the class pygame `GridworldEnv` |
+| `uv run python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3` | Same, in the terminal |
+| `uv run python docs/make_slides.py` | Builds `docs/presentation.pptx` from the figures |
+| `uv run python -m experiments.tune` | Optuna hyper-parameter search (multi-objective, resumable, parallel). Heavy: run it on a big machine |
+| `uv run pytest -q` | Runs the tests (DP ground truth, policy iteration = value iteration, env equivalence, convergence, Expected SARSA = Q-learning at ε=0, cache, statistics, search space) |
 
 ### Training on another machine
 
 Everything heavy is cached, so the workflow is: train once on a big machine, commit the results, and redraw anywhere in seconds.
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh   # if uv is not installed
 git clone git@github.com:ElTiToRuiz/assignment-1.git && cd assignment-1
-python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-pytest -q                                      # sanity check (~2 s)
-python -m experiments.tune --quick --storage /tmp/smoke.db   # 10-second smoke test of the pipeline
+uv sync
+uv run pytest -q                                      # sanity check (~2 s)
+uv run python -m experiments.tune --quick --storage /tmp/smoke.db   # 10-second smoke test of the pipeline
 
 # 1) Optuna: 12 studies x 150 trials x 5 seeds (~1-3 s per trial).
 #    About 1-1.5 CPU-hours: ~10-15 min with 8 cores. Resumable: if it stops, run it again.
 # (on macOS use $(sysctl -n hw.ncpu) instead of $(nproc))
-nohup python -m experiments.tune --workers $(nproc) > tune.log 2>&1 &
+nohup uv run python -m experiments.tune --workers $(nproc) > tune.log 2>&1 &
 
 # 2) Evaluate the tuned configurations on 20 held-out seeds and redraw every figure
 #    (RL_JOBS = parallel processes for the seeds, default min(20, #cores))
-RL_JOBS=$(nproc) python -m experiments.run_all
-python docs/make_slides.py
+RL_JOBS=$(nproc) uv run python -m experiments.run_all
+uv run python docs/make_slides.py
 
 # 3) Save the results
 git add results docs && git commit -m "Optuna study results" && git push

@@ -1,4 +1,4 @@
-"""Extra: analysis of the Optuna studies produced by `python -m experiments.tune`.
+"""Extra: analysis of the Optuna studies produced by `uv run python -m experiments.tune`.
 
 For every (environment, algorithm) study it:
   1. plots all trials in the (speed, exactness) plane with the Pareto front and the chosen trial;
@@ -194,7 +194,7 @@ def main():
     path = os.environ.get("RL_OPTUNA_DB", str(STORAGE))
     studies = load(path)
     if not studies:
-        print(f"  no Optuna studies in {path}. Run `python -m experiments.tune` first (ideally on a big machine).")
+        print(f"  no Optuna studies in {path}. Run `uv run python -m experiments.tune` first (ideally on a big machine).")
         return
     envs = [e for e in ENVS if any(k[0] == e for k in studies)]
     algos = [a for a in ALGOS if any(k[1] == a for k in studies)]
