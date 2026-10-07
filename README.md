@@ -30,87 +30,39 @@ Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `
 | Command | What it does |
 |---|---|
 | `uv run python -m experiments.run_all` | Rebuilds every figure and table **from the cache** (~10 s, no training) |
-| `uv run python -m experiments.run_all --retrain` | Trains everything again from scratch (~13 min on 8 cores) |
+| `uv run python -m experiments.run_all --retrain` | Trains everything again from scratch (~15 min on 8 cores) |
 | `uv run python -m experiments.run_all --only exp1 exp3` | Runs only some experiments |
 | `uv run python -m experiments.demo` | Loads a **saved model** (Q-table) and plays it in the class pygame `GridworldEnv` |
 | `uv run python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3` | Same, in the terminal |
 | `uv run python docs/make_slides.py` | Builds `docs/presentation.pptx` from the figures |
-| `uv run python -m experiments.tune` | Optuna hyper-parameter search (multi-objective, resumable, parallel). Heavy: run it on a big machine |
+| `uv run python -m experiments.tune` | Optuna hyper-parameter search (about 1 CPU-hour; resumable, so it can be stopped and rerun). `--quick` checks it works in seconds |
 | `uv run pytest -q` | Runs the tests (DP ground truth, policy iteration = value iteration, env equivalence, convergence, Expected SARSA = Q-learning at ε=0, cache, statistics, search space) |
-
-### Training on another machine
-
-Everything heavy is cached, so the workflow is: train once on a big machine, commit the results, and redraw anywhere in seconds. CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) checks on **Windows and Linux** that:
-- the tests pass;
-- the figures can be redrawn from the cache;
-- the Optuna pipeline runs.
-
-**Windows without git or admin rights (e.g. a managed university PC):** use `run_server.bat`.
-1. Download the code as a ZIP (<https://github.com/ElTiToRuiz/assignment-1/archive/refs/heads/main.zip>) and extract it.
-2. If `uv` is not installed, download [`uv-x86_64-pc-windows-msvc.zip`](https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip) and put `uv.exe` in a folder `uv\` next to `run_server.bat`. uv then installs Python in the user folder.
-3. Run `run_server.bat quick` (about 1 minute) to check that everything works, then run `run_server.bat`.
-4. It produces `results_upload.zip` with `results/` and `docs/`. Extract it over the repository on a machine with git, then commit and push.
-
-**Windows with git (PowerShell):**
-
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # install uv (once), then reopen the terminal
-git clone https://github.com/ElTiToRuiz/assignment-1.git; cd assignment-1
-uv sync
-uv run pytest -q                                                    # sanity check (~2 s)
-uv run python -m experiments.tune --quick --storage smoke\studies.db # 10-second smoke test
-
-# 1) Optuna: 12 studies x 150 trials x 5 seeds (~1-3 s per trial).
-#    About 1-1.5 CPU-hours: ~10-15 min with 8 cores. Resumable: if it stops, run the same command again.
-uv run python -m experiments.tune --workers $env:NUMBER_OF_PROCESSORS *>&1 | Tee-Object tune.log
-
-# 2) Evaluate the tuned configurations on 20 held-out seeds and redraw every figure
-$env:RL_JOBS = $env:NUMBER_OF_PROCESSORS
-uv run python -m experiments.run_all
-uv run python docs/make_slides.py
-
-# 3) Save the results
-git add results docs; git commit -m "Optuna study results"; git push
-```
-
-On Windows, keep the PowerShell window open while it runs. If it closes, just rerun the same `tune` command: it resumes.
-
-**Linux / macOS:**
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone https://github.com/ElTiToRuiz/assignment-1.git && cd assignment-1
-uv sync && uv run pytest -q
-nohup uv run python -m experiments.tune --workers $(nproc) > tune.log 2>&1 &   # macOS: $(sysctl -n hw.ncpu)
-RL_JOBS=$(nproc) uv run python -m experiments.run_all && uv run python docs/make_slides.py
-git add results docs && git commit -m "Optuna study results" && git push
-```
-
-Useful options:
-- `--trials 300` adds more trials to the existing studies.
-- `--envs cliff_walking` and `--algos SARSA Q-learning` run a subset.
-- `run_all --retrain` retrains every other experiment from scratch.
 
 ## Repository layout
 
 ```
-class_code/          env.py + tools.py from class (GridworldEnv)
-tabular_rl/
-  envs.py            EnvSpec (the env.P format from class), gridworld + Cliff Walking, fast Simulator
-  agents.py          Monte Carlo (1/N, constant α, exploring starts), SARSA, n-step SARSA, Expected SARSA,
-                     Q-learning, Double Q-learning; optional Robbins–Monro step size α/(1+k·N(s,a))
-  dp.py              value iteration (ground truth Q*), policy iteration, exact policy evaluation (for metrics)
-  runner.py          multi-seed training, metrics, disk cache, model save/load
-  stats.py           bootstrap confidence intervals and permutation test
-  viz.py             plot style and helpers
-experiments/         exp1 ... exp6, tune.py (Optuna), run_all.py, demo.py
+class_code/              env.py + tools.py from class (the GridworldEnv)
+tabular_rl/              the library
+  envs.py                the environments (class gridworld, Cliff Walking) in the class P format
+  simulator.py           plays an environment step by step: all the agents ever see
+  planning.py            value / policy iteration and exact policy evaluation (the answer key)
+  agents/
+    base.py              epsilon-greedy, the epsilon schedule, the step size, run bookkeeping
+    monte_carlo.py       Monte Carlo control (1/N or constant α, exploring starts)
+    sarsa.py             SARSA, Expected SARSA, n-step SARSA (on-policy)
+    q_learning.py        Q-learning, Double Q-learning (off-policy)
+  metrics.py             how a Q-table is graded against Q*
+  training.py            many seeds in parallel + the disk cache
+  models.py              save / load Q-tables
+  plotting.py            figure style and the shared plots
+  stats.py               bootstrap confidence intervals and permutation test
+experiments/             exp1 ... exp6, tune.py (Optuna), run_all.py, demo.py
 results/
-  optuna/            Optuna studies (SQLite, created by experiments/tune.py)
-  cache/             cached training results (.npz + .json with the config and training time)
-  models/            final Q-tables per environment x algorithm (.npy)
-  figures/           all plots
-  tables/            all tables (.csv)
-docs/                THEORY.md (Q&A for the oral part), presentation.pptx, make_slides.py
+  cache/                 training results (.npz) with a readable .json next to each
+  optuna/                the Optuna studies (SQLite)
+  models/                final Q-table per environment x algorithm (.npy)
+  figures/, tables/      everything shown below
+docs/                    THEORY.md (notes for the oral part), presentation.pptx, make_slides.py
 tests/
 ```
 
@@ -210,9 +162,7 @@ This is the classic result. Q-learning learns the optimal path but keeps falling
 
 ### 4. Hyper-parameter tuning with Optuna (`exp4`)
 
-#### 4a. Full study: all algorithms, multi-objective (`experiments/tune.py`)
-
-This is the main hyper-parameter study. It is meant to run on a bigger machine (see [Training on another machine](#training-on-another-machine)).
+The search is `experiments/tune.py` and the analysis is `exp4`.
 - **Studies:** one Optuna study per environment × algorithm. Environments: slippery gridworld, Cliff Walking. Algorithms: SARSA, Expected SARSA, Q-learning, Double Q, n-step SARSA, constant-α MC.
 - **Search space:**
   - α, plus optionally the Robbins–Monro decay α/(1+k·N(s,a));
@@ -222,7 +172,7 @@ This is the main hyper-parameter study. It is meant to run on a bigger machine (
   - **speed**: mean regret during training;
   - **exactness**: regret over the last 100 episodes.
 
-  The preliminary study below showed that these two conflict. So we keep the whole **Pareto front** and pick the point with the lowest speed + exactness.
+  They pull against each other: a configuration can learn fast and still end up slightly wrong. So we keep the whole **Pareto front** and pick the point with the lowest speed + exactness.
 - **Sampler:** multivariate TPE, 150 trials, 5 tuning seeds. Trial 0 is always the default configuration.
 - **Storage:** SQLite (`results/optuna/studies.db`), so it is resumable and runs in parallel across processes.
 - **Evaluation** (`exp4`) on **20 held-out seeds**:
@@ -230,7 +180,7 @@ This is the main hyper-parameter study. It is meant to run on a bigger machine (
   - a permutation test (default vs tuned);
   - PED-ANOVA parameter importance.
 
-**Results.** All 12 studies were run, 150 trials each, on a Windows machine (`run_server.bat`).
+**Results.** All 12 studies, 150 trials each.
 
 ![tuned](results/figures/exp4_default_vs_tuned.png)
 
@@ -283,30 +233,6 @@ The full numbers (95% CIs, exactness p-values) are in `results/tables/exp4_defau
 Other figures:
 - [`exp4_pareto.png`](results/figures/exp4_pareto.png): every trial with its Pareto front;
 - [`exp4_param_importance.png`](results/figures/exp4_param_importance.png): parameter importance.
-
-#### 4b. Preliminary study (SARSA and Q-learning, single objective)
-
-![optuna](results/figures/exp4_preliminary_optuna.png)
-
-**Setup.** TPE sampler, 40 trials per algorithm. The search space is α ∈ [0.01, 1] and the full ε schedule. The objective is the mean regret over training (speed of learning) on 5 tuning seeds. The comparison uses **20 held-out seeds**.
-
-| Algorithm | Config | α | ε (start, min, decay) | Mean regret (held-out) | Seeds with π\* |
-|---|---|---|---|---|---|
-| SARSA | default | 0.1 | (1.0, 0.05, 0.995) | 0.0361 | 7/20 |
-| SARSA | tuned | 0.0155 | (0.52, 0.0016, 0.9936) | **0.0141** | 5/20 |
-| Q-learning | default | 0.1 | (1.0, 0.05, 0.995) | 0.0148 | 7/20 |
-| Q-learning | tuned | 0.0689 | (0.93, 0.0027, 0.9996) | **0.0069** | **19/20** |
-
-**Findings:**
-- Tuning more than halves the regret for both algorithms.
-- The main gain is a much lower ε_min: less random behaviour at the end.
-- SARSA prefers a small α. Its target is noisier because it depends on the sampled a'.
-- **Lower regret does not mean more seeds with π\* (SARSA: 7/20 → 5/20).** The objective is the mean regret *over training*, which rewards fast learning. The tuned SARSA:
-  - with α = 0.0155, gets close to π\* quickly but makes small updates;
-  - therefore, in the states next to the pit, it often stays on an almost-tied, slightly worse action.
-
-  The regret is small but not 0. The objective decides what "better" means; tuning on "seeds with π\*" would trade speed for exactness.
-- The gap between the tuning objective (0.0013) and the held-out result (0.0141) shows **over-fitting to the tuning seeds**, which is why we evaluate on separate seeds.
 
 ### 5. Analysis of the training process (`exp5`)
 

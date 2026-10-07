@@ -1,22 +1,22 @@
-"""Extra: why Monte Carlo and Double Q-learning fail in Cliff Walking, and how to fix them.
+"""Experiment 6: why Monte Carlo and Double Q-learning fail in Cliff Walking, and how to fix them.
 
-Cliff Walking pays -1 per step, so with gamma = 0.99 a policy that never reaches the goal is worth
--1 / (1 - gamma) = -100. Early episodes are very long (hundreds of steps, many cliff falls). If the
-estimates are driven to that plateau before the goal is found, every action looks equally bad
-(about -100), the greedy policy wanders in loops and the goal signal never propagates back.
+Every step costs -1, so with gamma = 0.99 a policy that never reaches the goal is worth
+-1 / (1 - gamma) = -100. The first episodes are very long and full of falls. If the estimates sink
+to that -100 level before the goal has been found, every action looks equally bad, the agent wanders
+in circles and the news of the goal never travels back.
 
-  * Monte Carlo with the class step 1/N(s,a) averages over ALL returns ever seen, so the catastrophic
-    returns of the first episodes stay in the mean forever. Constant-alpha MC forgets them.
-  * Double Q-learning with alpha = 0.5: each table gets half the updates, and a few seeds collapse to
-    the -100 plateau. A smaller alpha (0.1) avoids it.
+  - Monte Carlo with the class step 1/N keeps an average of every return it has ever seen, so the
+    awful returns of the first episodes never leave the average. A constant alpha forgets them.
+  - Double Q-learning with alpha = 0.5 collapses in a few seeds, because each table only gets half
+    of the updates. A smaller alpha avoids it.
 """
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from tabular_rl.envs import make_spec
-from tabular_rl.runner import train
-from tabular_rl.viz import COLORS, save, snap_x
+from tabular_rl.training import train
+from tabular_rl.plotting import COLORS, save, snap_x
 
 from .common import CONFIG, N_JOBS, SEEDS, save_table
 

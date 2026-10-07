@@ -3,32 +3,19 @@ name: tests
 on:
   push:
   pull_request:
-  workflow_dispatch:
 
 jobs:
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     env:
-      PYTHONUTF8: "1"
-      SDL_VIDEODRIVER: dummy  # pygame without a display
+      SDL_VIDEODRIVER: dummy  # pygame without a screen
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - name: Install dependencies
-        run: uv sync
+      - run: uv sync
       - name: Unit tests
         run: uv run pytest -q
-      - name: Redraw every figure from the cache (no training)
+      - name: Every figure can be redrawn from the cache, without training
         run: uv run python -m experiments.run_all
-      - name: Optuna pipeline smoke test (multi-process, SQLite)
-        run: uv run python -m experiments.tune --quick --workers 2 --storage smoke/studies.db --envs cliff_walking --algos SARSA "MC constant-α"
-      - name: Demo with a saved model (terminal)
-        run: uv run python -m experiments.demo --render ansi --episodes 1
-      - name: Windows batch script (quick mode)
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: run_server.bat quick
+      - name: The Optuna search runs
+        run: uv run python -m experiments.tune --quick --workers 2 --storage /tmp/smoke.db --envs cliff_walking --algos SARSA

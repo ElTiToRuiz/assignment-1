@@ -1,12 +1,17 @@
-"""Extra: deeper analysis of the training process.
-(a) learning-rate sensitivity   (b) exploration schedule   (c) MC vs TD bias/variance   (d) state coverage
+"""Experiment 5: a closer look at training itself.
+
+  (a) how the learning rate trades speed for noise
+  (b) how much to explore, and for how long
+  (c) Monte Carlo vs TD: the bias / variance trade-off from the slides
+  (d) which states the agent actually visits
 """
 import matplotlib.pyplot as plt
 import numpy as np
 
 from tabular_rl.envs import make_spec
-from tabular_rl.runner import moving_average, train
-from tabular_rl.viz import COLORS, plot_band, save, snap_x
+from tabular_rl.metrics import moving_average
+from tabular_rl.training import train
+from tabular_rl.plotting import COLORS, plot_band, save, snap_x
 
 from .common import N_JOBS, train_default
 

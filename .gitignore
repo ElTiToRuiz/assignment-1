@@ -4,7 +4,3 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
-results/*_log.txt
-smoke/
-results_upload.zip
-uv/

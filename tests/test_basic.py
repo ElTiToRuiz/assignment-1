@@ -1,11 +1,13 @@
+"""Quick checks (about 2 s): the ground truth is right, the agents learn, and the tooling works."""
 import numpy as np
 
 from class_code.env import GridworldEnv
-from tabular_rl import runner
+from tabular_rl import models, training
 from tabular_rl.agents import ALGORITHMS, expected_sarsa, q_learning
-from tabular_rl.dp import evaluate_policy, policy_iteration, value_iteration
-from tabular_rl.envs import Simulator, greedy_path, make_spec
-from tabular_rl.runner import run_many
+from tabular_rl.envs import greedy_path, make_spec
+from tabular_rl.planning import evaluate_policy, policy_iteration, value_iteration
+from tabular_rl.simulator import Simulator
+from tabular_rl.training import run_many
 
 
 def test_value_iteration_matches_closed_form_deterministic():
@@ -13,8 +15,17 @@ def test_value_iteration_matches_closed_form_deterministic():
     _, V, pi = value_iteration(spec)
     g = spec.gamma
     assert np.isclose(V[2], 1.0)                    # one step from the goal
-    assert np.isclose(V[spec.start_state], g ** 4)  # 8->4->0->1->2->3: reward +1 on the 5th step
+    assert np.isclose(V[spec.start_state], g ** 4)  # 8->4->0->1->2->3: the +1 arrives on the 5th step
     assert np.allclose(evaluate_policy(spec, pi), V)
+
+
+def test_policy_iteration_matches_value_iteration():
+    for env_name in ["gridworld_deterministic", "gridworld_slippery", "cliff_walking"]:
+        spec = make_spec(env_name)
+        _, V_vi, _ = value_iteration(spec)
+        _, V_pi, pi, _ = policy_iteration(spec)
+        assert np.allclose(V_pi, V_vi, atol=1e-8)
+        assert np.allclose(evaluate_policy(spec, pi), V_vi, atol=1e-8)
 
 
 def test_simulator_matches_class_env_transitions():
@@ -36,7 +47,7 @@ def test_all_algorithms_learn_optimal_policy_deterministic():
 
 
 def test_expected_sarsa_with_greedy_policy_equals_q_learning():
-    """With eps=0 the expectation over the greedy policy is the max -> identical updates."""
+    """With eps = 0 the average over the next action is just the max, so the updates are identical."""
     spec = make_spec("gridworld_slippery")
     kw = dict(n_episodes=200, alpha=0.3, eps=(0.0, 0.0, 1.0), seed=3)
     assert np.allclose(expected_sarsa(spec, **kw).Q, q_learning(spec, **kw).Q)
@@ -49,25 +60,15 @@ def test_cliff_greedy_path_of_optimal_q_is_shortest():
 
 
 def test_cache_and_model_roundtrip(tmp_path, monkeypatch):
-    monkeypatch.setattr(runner, "CACHE_DIR", tmp_path / "cache")
-    monkeypatch.setattr(runner, "MODELS_DIR", tmp_path / "models")
+    monkeypatch.setattr(training, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(models, "MODELS_DIR", tmp_path / "models")
     kw = dict(n_episodes=50, alpha=0.2)
-    a = runner.train("SARSA", "gridworld_deterministic", [0, 1], **kw)
+    a = training.train("SARSA", "gridworld_deterministic", [0, 1], **kw)
     assert len(list((tmp_path / "cache").glob("*.npz"))) == 1
-    b = runner.train("SARSA", "gridworld_deterministic", [0, 1], **kw)  # loaded, not retrained
+    b = training.train("SARSA", "gridworld_deterministic", [0, 1], **kw)  # loaded, not retrained
     assert np.allclose(a["Q"], b["Q"], atol=1e-6)
-    runner.save_model("gridworld_deterministic", "SARSA", a["Q"].mean(0))
-    assert np.allclose(runner.load_model("gridworld_deterministic", "SARSA"), a["Q"].mean(0))
-
-
-def test_policy_iteration_matches_value_iteration():
-    for env_name in ["gridworld_deterministic", "gridworld_slippery", "cliff_walking"]:
-        spec = make_spec(env_name)
-        Q_vi, V_vi, _ = value_iteration(spec)
-        _, V_pi, pi, k = policy_iteration(spec)
-        assert np.allclose(V_pi, V_vi, atol=1e-8)
-        assert np.allclose(evaluate_policy(spec, pi), V_vi, atol=1e-8)  # PI's policy is optimal
-        print(env_name, "policy iteration steps:", k)
+    models.save_model("gridworld_deterministic", "SARSA", a["Q"].mean(0))
+    assert np.allclose(models.load_model("gridworld_deterministic", "SARSA"), a["Q"].mean(0))
 
 
 def test_stats_helpers():
@@ -85,9 +86,9 @@ def test_tune_default_trial_reproduces_default_config():
     from experiments.tune import ALGOS, ENVS, default_kwargs, default_params, suggest
     for env in ENVS:
         for algo in ALGOS:
-            trial = optuna.trial.FixedTrial(default_params(env, algo))
-            kw, ref = suggest(trial, env, algo), default_kwargs(env, algo)
+            kw = suggest(optuna.trial.FixedTrial(default_params(env, algo)), env, algo)
+            ref = default_kwargs(env, algo)
             assert np.isclose(kw["alpha"], ref["alpha"]) and "alpha_decay" not in kw
             assert np.allclose(kw["eps"][:2], ref["eps"][:2])
-            assert abs(kw["eps"][2] - ref["eps"][2]) < 1e-6 or ref["eps"][2] == 1.0  # constant eps: eps_min = eps_start
+            assert abs(kw["eps"][2] - ref["eps"][2]) < 1e-6 or ref["eps"][2] == 1.0
             assert kw.get("n") == ref.get("n")

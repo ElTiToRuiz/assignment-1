@@ -1,11 +1,15 @@
-"""Extra: compare all tabular control algorithms on the three environments. Also saves the models."""
+"""Experiment 2: every algorithm on every environment, with the same settings, so they can be compared.
+
+It also saves the final Q-tables in results/models/ (the "trained models" the demo plays).
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from tabular_rl.envs import make_spec
-from tabular_rl.runner import moving_average, save_model
-from tabular_rl.viz import COLORS, ENV_NAMES, plot_band, plot_value_policy, save, snap_x
+from tabular_rl.metrics import moving_average
+from tabular_rl.models import save_model
+from tabular_rl.plotting import COLORS, ENV_NAMES, plot_band, plot_value_policy, save, snap_x
 
 from .common import ALGOS, ENVS, save_table, summary_row, train_default
 

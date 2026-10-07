@@ -16,7 +16,7 @@ Short answers to the questions most likely to come up. Each one is linked to thi
 - **BOE** (characterises the optimum):
   Q*(s,a) = Σ_{s',r} p(s',r|s,a) [ r + γ max_{a'} Q*(s',a') ]
 - **Policy iteration** applies the BE (evaluation), then improves greedily. **Value iteration** applies the BOE directly.
-- Both need the **model** P. We implement both in `tabular_rl/dp.py`, and a test checks that they give the same V*. Number of sweeps to converge:
+- Both need the **model** P. We implement both in `tabular_rl/planning.py`, and a test checks that they give the same V*. Number of sweeps to converge:
 
   | | Value iteration (tol 1e-8) | Policy iteration |
   |---|---|---|
@@ -27,7 +27,7 @@ Short answers to the questions most likely to come up. Each one is linked to thi
   This matches the comparison table from class:
   - **value iteration** converges only asymptotically; each sweep is cheap, but it needs many of them;
   - **policy iteration** converges exactly in a few steps; each step is expensive, because it solves a linear system.
-- Here, `tabular_rl/dp.py` uses value iteration only to compute the *ground truth* Q* for the metrics; the agents never see P.
+- Here, `tabular_rl/planning.py` uses value iteration only to compute the *ground truth* Q* for the metrics; the agents never see P.
 
 ## 3. Model-free: Monte Carlo vs TD
 | | Monte Carlo | TD (SARSA / Q-learning) |
@@ -48,7 +48,7 @@ This works like a gradient step: it moves the estimate towards the Bellman targe
 ## 5. SARSA (on-policy TD control)
 - Target: r + γ Q(s', a'), where a' is the action the ε-greedy policy **really takes next**. The name comes from the tuple (S, A, R, S', A').
 - It is a sample of the **Bellman equation** for the ε-greedy policy, so it learns Q^{π_ε}: the value of the policy *including its exploration*.
-- Code: `tabular_rl/agents.py::sarsa`. a' is sampled **before** the update and then executed.
+- Code: `tabular_rl/agents/sarsa.py`. a' is sampled **before** the update and then executed.
 - It converges to Q* only if exploration fades out (GLIE) and the step sizes satisfy Robbins–Monro (Σα = ∞, Σα² < ∞).
 - **We verified this (`exp1`).** In the slippery world, with the default schedule (ε_min = 0.05, constant α), SARSA reaches π* in only 15/20 seeds:
   - its greedy action is wrong in states 6 and 11, next to the pit;
@@ -114,8 +114,7 @@ This works like a gradient step: it moves the estimate towards the Bellman targe
 
 ## 15. Hyper-parameter tuning (Optuna)
 - **TPE (Tree-structured Parzen Estimator):** Bayesian optimisation. It splits past trials into good and bad, models the density of each, and proposes points where good / bad is high.
-- **Preliminary study** (single objective = area under the regret curve): lower mean regret, but tuned SARSA reached exactly π* in fewer seeds. The objective defines what "better" means.
-- **Full study** (`experiments/tune.py`) is **multi-objective**: speed (mean regret during training) and exactness (final regret). Result: a **Pareto front**, i.e. configurations where neither objective can improve without worsening the other. We pick the point with the lowest sum.
+- **Our study** (`experiments/tune.py`) is **multi-objective**: speed (mean regret during training) and exactness (final regret). Result: a **Pareto front**, i.e. configurations where neither objective can improve without worsening the other. We pick the point with the lowest sum.
 - **Search space:** α, an optional Robbins–Monro decay α/(1+k·N), the ε schedule (start, minimum, half-life) and n.
 - **Over-fitting:** tune on 5 seeds, report on 20 different **held-out** seeds, like a train/test split.
 - **Statistics:**

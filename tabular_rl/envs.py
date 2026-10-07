@@ -1,21 +1,21 @@
-"""Environment specifications and a fast sampler.
+"""The environments.
 
-An environment is described by an `EnvSpec`, which holds the MDP dynamics in the
-same format used in class (`env.P[s][a] = [(prob, s', reward, done), ...]`).
-The learning agents never look at `P`: they only call `Simulator.reset/step`,
-exactly like with the class `GridworldEnv`. `P` is only used by the dynamic
-programming code (ground truth `Q*`) and by the exact policy evaluation used for
-metrics.
+Each one is an `EnvSpec`: the grid layout plus the full dynamics in the same format as in class,
+P[s][a] = [(prob, next_state, reward, done), ...].
+
+The agents never read P directly. They only play the environment through `Simulator`, exactly as
+they would with the class GridworldEnv. We keep P around for two things only: computing the true
+optimum with dynamic programming, and grading the learned policies exactly.
 """
 import os
-import random
 from dataclasses import dataclass, field
 
 import numpy as np
 
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")  # the class env imports pygame, which is chatty
 from class_code.env import GridworldEnv
 
+# Same action numbering as the class env.
 ACTIONS = {0: (0, -1), 1: (1, 0), 2: (0, 1), 3: (-1, 0)}  # LEFT, DOWN, RIGHT, UP
 ARROWS = {0: "←", 1: "↓", 2: "→", 3: "↑"}
 
@@ -27,24 +27,22 @@ class EnvSpec:
     n_states: int
     n_actions: int
     start_state: int
-    shape: tuple
+    shape: tuple          # (rows, cols), states are numbered row by row
     gamma: float
-    max_steps: int
-    terminals: dict = field(default_factory=dict)  # state -> terminal reward
+    max_steps: int        # episodes are cut here so a bad policy cannot loop forever
+    terminals: dict = field(default_factory=dict)  # terminal state -> its reward
     walls: set = field(default_factory=set)
     cliffs: set = field(default_factory=set)
 
     @property
     def valid_states(self):
-        """Non-terminal states that the agent can actually be in."""
-        return [
-            s for s in range(self.n_states)
-            if s not in self.terminals and s not in self.walls and s not in self.cliffs
-        ]
+        """States the agent can actually stand on and act from."""
+        blocked = set(self.terminals) | self.walls | self.cliffs
+        return [s for s in range(self.n_states) if s not in blocked]
 
 
 def gridworld_spec(slippery: bool) -> EnvSpec:
-    """3x4 Russell & Norvig gridworld from class (deterministic or 80/10/10 slippery)."""
+    """The 3x4 Russell & Norvig gridworld from class. Slippery: 80% intended move, 10% to each side."""
     env = GridworldEnv(is_slippery=slippery)
     return EnvSpec(
         name="gridworld_slippery" if slippery else "gridworld_deterministic",
@@ -61,7 +59,11 @@ def gridworld_spec(slippery: bool) -> EnvSpec:
 
 
 def cliff_spec() -> EnvSpec:
-    """Sutton & Barto's Cliff Walking (4x12). -1 per step, -100 and back to start on the cliff."""
+    """Cliff Walking from Sutton & Barto (4x12).
+
+    Every step costs -1. Stepping into the cliff costs -100 and sends you back to the start,
+    but the episode goes on. Only the goal ends it.
+    """
     n_rows, n_cols = 4, 12
     start, goal = (n_rows - 1) * n_cols, n_rows * n_cols - 1
     cliffs = set(range(start + 1, goal))
@@ -74,6 +76,7 @@ def cliff_spec() -> EnvSpec:
             if s == goal:
                 P[s][a] = [(1.0, s, 0.0, True)]
                 continue
+            # walking into the border just leaves you where you are
             nr, nc = min(max(r + dr, 0), n_rows - 1), min(max(c + dc, 0), n_cols - 1)
             s2 = nr * n_cols + nc
             if s2 in cliffs:
@@ -88,48 +91,19 @@ def cliff_spec() -> EnvSpec:
 
 
 def make_spec(name: str) -> EnvSpec:
-    return {
-        "gridworld_deterministic": lambda: gridworld_spec(False),
-        "gridworld_slippery": lambda: gridworld_spec(True),
+    builders = {
+        "gridworld_deterministic": lambda: gridworld_spec(slippery=False),
+        "gridworld_slippery": lambda: gridworld_spec(slippery=True),
         "cliff_walking": cliff_spec,
-    }[name]()
-
-
-class Simulator:
-    """Samples transitions from `spec.P` (same behaviour as `GridworldEnv.step`, but fast).
-
-    `step` returns (next_state, reward, done). Own RNG -> reproducible runs.
-    """
-
-    def __init__(self, spec: EnvSpec, seed: int = 0):
-        self.spec = spec
-        self.rng = random.Random(seed)
-        self.s = spec.start_state
-        self._table = {
-            (s, a): ([t[0] for t in trs], trs)
-            for s, acts in spec.P.items() for a, trs in acts.items() if trs
-        }
-
-    def reset(self, state=None):
-        """Back to the start state (or to `state`, used by Monte Carlo exploring starts)."""
-        self.s = self.spec.start_state if state is None else state
-        return self.s
-
-    def step(self, a):
-        probs, trs = self._table[(self.s, a)]
-        if len(trs) == 1:
-            _, s2, r, done = trs[0]
-        else:
-            _, s2, r, done = self.rng.choices(trs, weights=probs)[0]
-        self.s = s2
-        return s2, r, done
+    }
+    return builders[name]()
 
 
 def greedy_path(spec: EnvSpec, Q, limit=60):
-    """States visited by the greedy policy from the start state (follows the most likely transition)."""
+    """The states the greedy policy walks through from the start (taking the most likely outcome)."""
     s, path = spec.start_state, [spec.start_state]
     for _ in range(limit):
-        prob, s, _, done = max(spec.P[s][int(np.argmax(Q[s]))], key=lambda t: t[0])
+        _, s, _, done = max(spec.P[s][int(np.argmax(Q[s]))], key=lambda t: t[0])
         path.append(s)
         if done:
             break

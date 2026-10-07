@@ -1,16 +1,14 @@
-"""Plot helpers and the common figure style. All figures are saved to results/figures/."""
-from pathlib import Path
-
+"""One look for every figure, plus the two plots we draw everywhere: a value/policy grid and a
+learning curve over seeds. Figures are saved to results/figures/."""
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
 from .envs import ARROWS
+from .paths import FIGURES
 
-FIGURES = Path(__file__).resolve().parent.parent / "results" / "figures"
-
-# Okabe-Ito colour-blind safe palette
+# Okabe-Ito palette: stays readable for colour-blind people and in black and white
 COLORS = {
     "Monte Carlo": "#7a7a7a",
     "MC constant-α": "#CC79A7",
@@ -53,7 +51,8 @@ def save(fig, name):
 
 
 def plot_value_policy(ax, spec, Q, title="", path=None):
-    """Heat-map of V(s) = max_a Q(s,a) with the greedy policy drawn as arrows."""
+    """The grid coloured by V(s) = max_a Q(s,a), with the greedy action(s) as arrows.
+    When several actions are equally good, all of them are drawn."""
     nr, nc = spec.shape
     V = Q.max(axis=1)
     grid = np.full((nr, nc), np.nan)
@@ -93,9 +92,12 @@ def plot_value_policy(ax, spec, Q, title="", path=None):
 
 
 def plot_band(ax, y, label=None, color=None, x=None, robust=False, floor=None):
-    """Curve across seeds, y: (n_seeds, n_points).
-    robust=False: mean +- 1 std.  robust=True: median with 25-75 percentile band (insensitive to outliers).
-    `floor` clips the band from below (e.g. 0 for regret, which can't be negative)."""
+    """A curve summarising many seeds. y has one row per seed.
+
+    By default: mean with a +-1 std band. robust=True: median with the 25-75% band instead, so a
+    couple of runaway seeds do not hide what the typical run does. `floor` stops the band from going
+    below a value that makes no sense (regret can't be negative).
+    """
     y = np.asarray(y, dtype=float)
     if robust:
         m, lo, hi = np.median(y, 0), np.percentile(y, 25, 0), np.percentile(y, 75, 0)
@@ -110,12 +112,12 @@ def plot_band(ax, y, label=None, color=None, x=None, robust=False, floor=None):
 
 
 def snap_x(out, log_every=10):
-    """Episode index of every Q snapshot."""
+    """The episode number of every Q snapshot (one every `log_every` episodes)."""
     return np.arange(1, out["regret"].shape[1] + 1) * log_every
 
 
 def smooth(y, w=10):
-    """Trailing moving average that keeps the original length (window shrinks at the start)."""
+    """Moving average that keeps the same length (the window is just shorter at the start)."""
     y = np.asarray(y, dtype=float)
     c = np.cumsum(y, axis=-1)
     out = c.copy()

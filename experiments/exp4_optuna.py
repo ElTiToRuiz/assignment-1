@@ -1,29 +1,29 @@
-"""Extra: analysis of the Optuna studies produced by `uv run python -m experiments.tune`.
+"""Experiment 4: what the Optuna search found (the search itself is experiments/tune.py).
 
-For every (environment, algorithm) study it:
-  1. plots all trials in the (speed, exactness) plane with the Pareto front and the chosen trial;
-  2. re-trains the default and the tuned configuration on 20 held-out seeds (cached) and compares
-     them with bootstrap 95% confidence intervals and a permutation test;
-  3. estimates which hyper-parameters matter (PED-ANOVA importance).
-The studies themselves are never re-run here, so this is fast once the cache exists.
-Set RL_OPTUNA_DB=<file> to read another database.
+For every study it:
+  1. draws every trial on the speed / exactness plane, with the Pareto front and the chosen trial;
+  2. retrains the default and the tuned settings on 20 fresh seeds and compares them, with bootstrap
+     confidence intervals and a permutation test (are the gains real, or luck?);
+  3. measures which hyper-parameters matter most (PED-ANOVA).
+
+It never reruns the search, and the retraining is cached, so it is fast.
+RL_OPTUNA_DB=<file> reads the studies from a different file.
 """
 import json
 import os
+import warnings
 from pathlib import Path
 
-import warnings
-
 import matplotlib.pyplot as plt
-from matplotlib.ticker import NullFormatter
 import numpy as np
 import optuna
 import pandas as pd
+from matplotlib.ticker import NullFormatter
 
 from tabular_rl.envs import make_spec
-from tabular_rl.runner import train
+from tabular_rl.plotting import COLORS, ENV_NAMES, save
 from tabular_rl.stats import bootstrap_ci, permutation_test
-from tabular_rl.viz import COLORS, ENV_NAMES, save
+from tabular_rl.training import train
 
 from .common import N_JOBS, SEEDS, save_table
 from .tune import ALGOS, BUDGET, ENVS, STORAGE, chosen_trial, default_kwargs, storage_url, study_name
@@ -47,13 +47,14 @@ def load(storage_path):
 
 
 def tuned_kwargs(study):
+    """The agent arguments of the chosen trial (Optuna stores them as JSON, tuples become lists)."""
     kw = json.loads(chosen_trial(study).user_attrs["kwargs"])
     kw["eps"] = tuple(kw["eps"])
     return kw
 
 
 def held_out(env, algo, kw, n_episodes):
-    """Normalised regret per held-out seed: (speed, exactness, exactly optimal at the end)."""
+    """Train on the 20 evaluation seeds. Per seed: (speed, exactness, ended exactly optimal?)."""
     out = train(algo, env, SEEDS, n_jobs=N_JOBS, n_episodes=n_episodes, **kw)
     norm = abs(out["V_star"][make_spec(env).start_state])
     reg = np.clip(out["regret"], 0, None) / norm
@@ -194,7 +195,7 @@ def main():
     path = os.environ.get("RL_OPTUNA_DB", str(STORAGE))
     studies = load(path)
     if not studies:
-        print(f"  no Optuna studies in {path}. Run `uv run python -m experiments.tune` first (ideally on a big machine).")
+        print(f"  no Optuna studies in {path}. Run `uv run python -m experiments.tune` first.")
         return
     envs = [e for e in ENVS if any(k[0] == e for k in studies)]
     algos = [a for a in ALGOS if any(k[1] == a for k in studies)]

@@ -1,5 +1,0 @@
-algorithm,config,alpha,"eps (start, min, decay)",objective on tuning seeds,mean regret held-out,final regret held-out,seeds optimal
-SARSA,default,0.1,"(1.0, 0.05, 0.995)",0.0353,0.0361,0.0205,7/20
-SARSA,tuned,0.0155,"(0.5226, 0.0016, 0.9936)",0.0013,0.0141,0.013,5/20
-Q-learning,default,0.1,"(1.0, 0.05, 0.995)",0.0222,0.0148,0.0062,7/20
-Q-learning,tuned,0.0689,"(0.9295, 0.0027, 0.9996)",0.0052,0.0069,0.0039,19/20

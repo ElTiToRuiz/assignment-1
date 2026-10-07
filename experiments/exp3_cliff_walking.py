@@ -1,12 +1,16 @@
-"""Extra: on-policy vs off-policy on Cliff Walking.
-SARSA learns the safe path (it accounts for its own exploration), Q-learning the optimal risky path."""
+"""Experiment 3: on-policy vs off-policy, the classic Cliff Walking example.
+
+SARSA learns a safe path away from the edge, because it knows it will sometimes take a random step.
+Q-learning learns the shortest path along the edge, because it learns about the greedy policy. So
+while exploring, Q-learning falls more often, even though what it learned is the true optimum.
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from tabular_rl.envs import greedy_path, make_spec
-from tabular_rl.runner import moving_average
-from tabular_rl.viz import COLORS, plot_band, plot_value_policy, save, snap_x
+from tabular_rl.metrics import moving_average
+from tabular_rl.plotting import COLORS, plot_band, plot_value_policy, save, snap_x
 
 from .common import CONFIG, save_table, train_default
 
