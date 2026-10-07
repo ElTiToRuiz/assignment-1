@@ -23,7 +23,7 @@ uv sync                                           # creates .venv with the locke
 
 Every command below runs through `uv run`, so there is no need to activate the virtual environment.
 
-Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `python-pptx` (slides), `pytest` (tests).
+Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `pytest` (tests). The slides are built with Node.js (`pptxgenjs`), only needed to rebuild them.
 
 ## How to run
 
@@ -34,7 +34,7 @@ Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `
 | `uv run python -m experiments.run_all --only exp1 exp3` | Runs only some experiments |
 | `uv run python -m experiments.demo` | Loads a **saved model** (Q-table) and plays it in the class pygame `GridworldEnv` |
 | `uv run python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3` | Same, in the terminal |
-| `uv run python docs/make_slides.py` | Builds `docs/presentation.pptx` from the figures |
+| `cd docs/presentation && npm install && npm run build` | Builds `docs/presentation.pptx` (the 5-minute talk + backup slides) from the results. Needs Node.js |
 | `uv run python -m experiments.tune` | Optuna hyper-parameter search (about 1 CPU-hour; resumable, so it can be stopped and rerun). `--quick` checks it works in seconds |
 | `uv run pytest -q` | Runs the tests (DP ground truth, policy iteration = value iteration, env equivalence, convergence, Expected SARSA = Q-learning at ε=0, cache, statistics, search space) |
 
@@ -62,7 +62,7 @@ results/
   optuna/                the Optuna studies (SQLite)
   models/                final Q-table per environment x algorithm (.npy)
   figures/, tables/      everything shown below
-docs/                    THEORY.md (notes for the oral part), presentation.pptx, make_slides.py
+docs/                    presentation.pptx (+ presentation/build.js that makes it), THEORY.md (notes for the oral part)
 tests/
 ```
 
