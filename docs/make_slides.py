@@ -130,6 +130,13 @@ def main():
         "• Everything is reproducible: results cached; `python -m experiments.run_all` redraws without training",
     ], Inches(0.7), Inches(1.4), Inches(12), Inches(5.5), size=20)
 
+    # backup: failure analysis
+    bullets_and_figure(prs, "Backup: why MC and Double Q fail in Cliff Walking", "Estimates collapse to the −1/(1−γ) = −100 'never arrive' plateau", [
+        "MC with 1/N: the −1500 returns of the first episodes stay in the mean forever (non-stationary target)",
+        "Constant-α MC: 14/20 stuck seeds → 0/20; exploring starts helps further",
+        "Double Q, α = 0.5: 3/20 seeds collapse to −100; α = 0.1 → 0/20",
+    ], "exp6_failure_analysis.png", split=0.3)
+
     # 9-10. backup slides for the questions (not part of the 5-minute talk)
     s = slide(prs, "Backup: dynamic programming (model-based)", "Used only as ground truth; agents never see P")
     add_text(s, [

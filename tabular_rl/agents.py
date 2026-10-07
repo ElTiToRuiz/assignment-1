@@ -9,6 +9,7 @@ Exploration: e-greedy with exponentially decaying epsilon,
 (eps_decay=1 -> constant epsilon).
 """
 import random
+from functools import partial
 from dataclasses import dataclass
 
 import numpy as np
@@ -149,7 +150,8 @@ def expected_sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.
     return rec.result(Q)
 
 
-def double_q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10) -> RunResult:
+def double_q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0, log_every=10,
+                      alpha_decay=0.0) -> RunResult:
     """Two tables: one picks argmax, the other evaluates it (removes maximisation bias)."""
     env, rng, rec = _setup(spec, seed, n_episodes, log_every)
     Q1 = np.zeros((spec.n_states, spec.n_actions))
@@ -163,7 +165,7 @@ def double_q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05,
             s2, r, done = env.step(a)
             A, B = (Q1, Q2) if rng.random() < 0.5 else (Q2, Q1)  # update A, evaluate with B
             target = r if done else r + spec.gamma * B[s2, greedy_action(A[s2], rng)]
-            A[s, a] += alpha * (target - A[s, a])
+            A[s, a] += step_size(alpha, alpha_decay, rec.visits[s, a]) * (target - A[s, a])
             rec.visits[s, a] += 1
             G, steps = G + r, steps + 1
             s = s2
@@ -174,7 +176,7 @@ def double_q_learning(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05,
 
 
 def n_step_sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.995), seed=0,
-                 log_every=10, n=3) -> RunResult:
+                 log_every=10, n=3, alpha_decay=0.0) -> RunResult:
     """n-step SARSA: target = r_t+1 + ... + gamma^(n-1) r_t+n + gamma^n Q(s_t+n, a_t+n)."""
     env, rng, rec = _setup(spec, seed, n_episodes, log_every)
     Q = np.zeros((spec.n_states, spec.n_actions))
@@ -198,7 +200,7 @@ def n_step_sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.99
                 Gn = sum(g ** (i - tau - 1) * R[i] for i in range(tau + 1, last + 1))
                 if tau + n < T:  # bootstrap if the episode has not ended within n steps
                     Gn += g ** n * Q[S[tau + n], A[tau + n]]
-                Q[S[tau], A[tau]] += alpha * (Gn - Q[S[tau], A[tau]])
+                Q[S[tau], A[tau]] += step_size(alpha, alpha_decay, rec.visits[S[tau], A[tau]]) * (Gn - Q[S[tau], A[tau]])
                 rec.visits[S[tau], A[tau]] += 1  # counts updates of (s,a)
             if tau >= T - 1:
                 break
@@ -208,21 +210,30 @@ def n_step_sarsa(spec: EnvSpec, n_episodes=2000, alpha=0.1, eps=(1.0, 0.05, 0.99
 
 
 def monte_carlo(spec: EnvSpec, n_episodes=2000, alpha=None, eps=(1.0, 0.05, 0.995), seed=0,
-                log_every=10, first_visit=False) -> RunResult:
-    """Monte Carlo e-greedy control (class "Montecarlo improved", without exploring starts).
+                log_every=10, first_visit=False, exploring_starts=False,
+                constant_alpha=False) -> RunResult:
+    """Monte Carlo e-greedy control (class "Montecarlo improved").
 
     Backward return computation + online sample-mean update Q <- Q + (G - Q)/N(s,a).
-    `alpha` is ignored (the step size is 1/N); kept for a common signature.
+    exploring_starts=True: every episode starts from a random (s, a) pair (class "Monte-Carlo
+    Exploring Starts"), so all pairs keep being visited even when the policy is bad.
+    Default step 1/N(s,a): the exact sample mean, as in class (`alpha` is then ignored).
+    constant_alpha=True uses `alpha` instead, which weights recent returns more. That matters in
+    control: the policy, and so the target, keeps changing, and the very bad returns of the first
+    episodes would otherwise stay in the mean forever (see exp6).
     """
     env, rng, rec = _setup(spec, seed, n_episodes, log_every)
     Q = np.zeros((spec.n_states, spec.n_actions))
     N = np.zeros_like(Q)
     for ep in range(n_episodes):
         e = epsilon_at(ep, eps)
-        s = env.reset()
+        if exploring_starts:
+            s, a0 = env.reset(rng.choice(spec.valid_states)), rng.randrange(spec.n_actions)
+        else:
+            s, a0 = env.reset(), None
         traj = []
-        for _ in range(spec.max_steps):
-            a = epsilon_greedy(Q[s], e, rng)
+        for t in range(spec.max_steps):
+            a = a0 if t == 0 and a0 is not None else epsilon_greedy(Q[s], e, rng)
             s2, r, done = env.step(a)
             traj.append((s, a, r))
             s = s2
@@ -239,7 +250,7 @@ def monte_carlo(spec: EnvSpec, n_episodes=2000, alpha=None, eps=(1.0, 0.05, 0.99
             if first_visit and first[(s, a)] != i:
                 continue
             N[s, a] += 1
-            Q[s, a] += (G_ret - Q[s, a]) / N[s, a]
+            Q[s, a] += (G_ret - Q[s, a]) * (alpha if constant_alpha else 1.0 / N[s, a])
         for s, a, _ in traj:
             rec.visits[s, a] += 1
         rec.end_episode(ep, sum(t[2] for t in traj), len(traj), Q)
@@ -248,6 +259,8 @@ def monte_carlo(spec: EnvSpec, n_episodes=2000, alpha=None, eps=(1.0, 0.05, 0.99
 
 ALGORITHMS = {
     "Monte Carlo": monte_carlo,
+    "MC constant-α": partial(monte_carlo, constant_alpha=True),
+    "MC Exploring Starts": partial(monte_carlo, constant_alpha=True, exploring_starts=True),
     "SARSA": sarsa,
     "n-step SARSA": n_step_sarsa,
     "Expected SARSA": expected_sarsa,

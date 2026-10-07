@@ -13,6 +13,8 @@ FIGURES = Path(__file__).resolve().parent.parent / "results" / "figures"
 # Okabe-Ito colour-blind safe palette
 COLORS = {
     "Monte Carlo": "#7a7a7a",
+    "MC constant-α": "#CC79A7",
+    "MC Exploring Starts": "#000000",
     "SARSA": "#0072B2",
     "n-step SARSA": "#56B4E9",
     "Expected SARSA": "#009E73",

@@ -58,8 +58,6 @@ def _one(args):
 
 def run_many(algo, spec, seeds, n_jobs=1, **kw):
     """Train `algo` once per seed (optionally in parallel). Returns a dict of arrays, one row per seed."""
-    if algo == "Monte Carlo":
-        kw.pop("alpha", None)  # MC uses the sample mean (step 1/N), not a constant alpha
     Q_star, V_star, _ = value_iteration(spec)
     tensors = model_tensors(spec)
     jobs = [(algo, spec, s, kw) for s in seeds]

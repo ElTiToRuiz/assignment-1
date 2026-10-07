@@ -110,8 +110,9 @@ class Simulator:
             for s, acts in spec.P.items() for a, trs in acts.items() if trs
         }
 
-    def reset(self):
-        self.s = self.spec.start_state
+    def reset(self, state=None):
+        """Back to the start state (or to `state`, used by Monte Carlo exploring starts)."""
+        self.s = self.spec.start_state if state is None else state
         return self.s
 
     def step(self, a):

@@ -1,0 +1,8 @@
+variant,stuck seeds,return (last 100 ep) median,return mean,greedy regret (median seed),seeds with optimal greedy policy
+"Monte Carlo (1/N, class)",14/20,-507.9,-374.2,87.75,0/20
+MC constant α=0.1,0/20,-39.0,-63.3,5.14,0/20
+MC constant α=0.1 + exploring starts,0/20,-27.5,-37.0,3.46,0/20
+Double Q α=0.5,3/20,-25.1,-221.3,3.46,0/20
+Double Q α=0.1,0/20,-26.1,-27.7,3.46,0/20
+SARSA α=0.5 (reference),0/20,-24.4,-25.8,3.46,0/20
+Q-learning α=0.5 (reference),0/20,-50.7,-51.9,0.0,20/20

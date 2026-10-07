@@ -36,9 +36,24 @@ def main():
     # Default schedule keeps eps_min = 0.05 and a constant alpha: SARSA then learns Q of the
     # eps-greedy policy and rarely visits the states next to the pit (6, 11). With GLIE exploration
     # and a decaying alpha, both algorithms reach the optimal policy in every seed.
+    fig_g, axes_g = plt.subplots(1, 3, figsize=(17, 4.6), layout="constrained")
     for a in ALGOS:
         o = train(a, "gridworld_slippery", SEEDS, n_jobs=N_JOBS, **CONVERGENT_SLIPPERY)
         rows.append({"env": "Slippery (GLIE + decaying α)", "algorithm": a, **summary_row(o, "gridworld_slippery")})
+        for tag, out, ls in [("default", train_default(a, "gridworld_slippery"), "--"), ("GLIE + decaying α", o, "-")]:
+            x = snap_x(out)
+            axes_g[0].plot(x, 100 * smooth((out["regret"] < 1e-9).mean(0), 10), ls, color=COLORS[a], lw=1.8, label=f"{a}, {tag}")
+            axes_g[1].plot(x, smooth(out["regret"].mean(0), 10), ls, color=COLORS[a], lw=1.8, label=f"{a}, {tag}")
+            axes_g[2].plot(x, out["rmse_opt"].mean(0), ls, color=COLORS[a], lw=1.8, label=f"{a}, {tag}")
+    axes_g[0].set(title="Seeds whose greedy policy is exactly π* (%)", ylabel="% of 20 seeds", ylim=(0, 105))
+    axes_g[1].set(title="Regret of the greedy policy (mean)", yscale="log")
+    axes_g[2].set(title="RMSE of Q on optimal actions (mean)", yscale="log")
+    for ax in axes_g:
+        ax.set(xlabel="episode", xscale="log")
+    axes_g[0].legend(loc="upper left")
+    fig_g.suptitle("Slippery gridworld: default schedule (dashed, ε_min=0.05, constant α) vs "
+                   "convergence conditions (solid, GLIE ε→0 + Robbins–Monro α)")
+    save(fig_g, "exp1_convergent_schedule.png")
     fig_p.suptitle("Learned values and greedy policies vs the optimum")
     fig_c.suptitle("SARSA vs Q-learning: learning curves (20 seeds, median/IQR or mean±std)")
     save(fig_p, "exp1_values_policies.png")

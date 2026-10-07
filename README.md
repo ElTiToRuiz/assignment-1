@@ -43,11 +43,12 @@ Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `
 class_code/          env.py + tools.py from class (GridworldEnv)
 tabular_rl/
   envs.py            EnvSpec (the env.P format from class), gridworld + Cliff Walking, fast Simulator
-  agents.py          Monte Carlo, SARSA, n-step SARSA, Expected SARSA, Q-learning, Double Q-learning
+  agents.py          Monte Carlo (1/N, constant α, exploring starts), SARSA, n-step SARSA, Expected SARSA,
+                     Q-learning, Double Q-learning; optional Robbins–Monro step size α/(1+k·N(s,a))
   dp.py              value iteration (ground truth Q*), policy iteration, exact policy evaluation (for metrics)
   runner.py          multi-seed training, metrics, disk cache, model save/load
   viz.py             plot style and helpers
-experiments/         exp1 ... exp5, run_all.py, demo.py
+experiments/         exp1 ... exp6, run_all.py, demo.py
 results/
   cache/             cached training results (.npz + .json with the config and training time)
   models/            final Q-tables per environment x algorithm (.npy)
@@ -122,6 +123,10 @@ The "convergent schedule" meets both:
 
 With it, **both algorithms reach the optimal policy in 20/20 seeds**. SARSA still needs about 15× more episodes than Q-learning to settle (median 13 510 vs 900), which is the cost of learning on-policy.
 
+![convergent](results/figures/exp1_convergent_schedule.png)
+
+The figure also shows the price of these guarantees. Q-learning with the default schedule reaches π\* in most seeds within about 500 episodes, sooner than with the convergent schedule. The default schedule just never gets *all* seeds there, because ε_min = 0.05 and a constant α keep it noisy. Theory guarantees the limit, not the speed.
+
 RMSE over *all* actions stays high in the deterministic world. Once the agent has found the path, it rarely visits bad actions or far states again (`exp5d`). That is why we report the error on the optimal actions.
 
 ### 2. All tabular algorithms (`exp2`)
@@ -187,6 +192,33 @@ This is the classic result. Q-learning learns the optimal path but keeps falling
 
 ---
 
+### 6. Failure analysis: why some methods fail in Cliff Walking (`exp6`)
+
+![failures](results/figures/exp6_failure_analysis.png)
+
+Cliff Walking pays −1 per step, so with γ = 0.99 a policy that **never reaches the goal is worth −1/(1−γ) = −100**. The first episodes are very long: hundreds of steps and many falls. If the estimates collapse to that −100 plateau before the goal is found, the following happens:
+- every action looks equally bad;
+- the greedy policy loops;
+- the goal signal never propagates back.
+
+| Variant | Stuck seeds | Median return (last 100 ep) | Greedy regret (median) |
+|---|---|---|---|
+| Monte Carlo, step 1/N (class version) | **14/20** | −507.9 | 87.75 |
+| MC, constant α = 0.1 | 0/20 | −39.0 | 5.14 |
+| MC, constant α = 0.1 + exploring starts | 0/20 | −27.5\* | 3.46 |
+| Double Q-learning, α = 0.5 | **3/20** | −25.1 (mean −221) | 3.46 |
+| Double Q-learning, α = 0.1 | 0/20 | −26.1 | 3.46 |
+| SARSA, α = 0.5 (reference) | 0/20 | −24.4 | 3.46 |
+| Q-learning, α = 0.5 (reference) | 0/20 | −50.7 | **0.00** |
+
+\* With exploring starts the episodes begin at random states, so the return is not directly comparable.
+
+**Monte Carlo.** With the class step size 1/N(s,a), Q is the mean of *all* returns ever seen. The catastrophic returns of the first, random episodes (about −1500) stay in that mean forever. In control the policy keeps improving, so the target is **non-stationary**. A constant α forgets old returns and fixes the collapse. Exploring starts (class *Monte-Carlo ES*) helps further: every (s,a) keeps being tried from short episodes near the goal.
+
+**Double Q-learning.** Each table gets only half of the updates. With a large α (0.5), in 3 seeds the Q values at the start state fall to −100 (red curves) and never recover. With α = 0.1, 0/20 seeds get stuck.
+
+A greedy regret of 3.46 is the safe path (17 steps instead of 13). Every on-policy method converges to it, because its target includes the ε = 0.1 exploration (see `exp3`).
+
 ## Conclusions
 
 1. SARSA and Q-learning both solve the deterministic and the stochastic gridworld.
@@ -195,5 +227,6 @@ This is the classic result. Q-learning learns the optimal path but keeps falling
 4. TD bootstraps: low variance, biased. MC uses real returns: unbiased, high variance, and episodes must terminate.
 5. Expected SARSA reduces variance. Double Q-learning removes maximisation bias but learns more slowly.
 6. Hyper-parameters matter. Optuna more than halved the regret, but tuning must be validated on held-out seeds.
+7. The failures in Cliff Walking are explained by theory. Monte Carlo's 1/N mean cannot forget the first catastrophic returns (the target is non-stationary in control), and too large an α makes Double Q collapse to the −100 "never arrive" plateau. Constant-α MC, exploring starts and a smaller α fix both.
 
 Theory Q&A for the oral part: [`docs/THEORY.md`](docs/THEORY.md). Slides: [`docs/presentation.pptx`](docs/presentation.pptx).

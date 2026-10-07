@@ -129,3 +129,11 @@ The assignment asks for "improvements/optimizations of seen algorithms". Each ex
 | **Median / IQR** | Plot statistics only: the band between the 25th and 75th percentile over the 20 seeds. It is robust to the few seeds with extreme values. |
 | **TPE (Optuna)** | Optuna's default sampler. It models which hyper-parameters gave good vs bad trials and proposes new ones where the good ones concentrate. |
 | **Held-out seeds** | Same idea as a train/test split: tune on 5 seeds, report on 20 different ones. |
+
+## 17. Why Monte Carlo and Double Q fail in Cliff Walking (`exp6`)
+- With −1 per step and γ = 0.99, a policy that never reaches the goal is worth Σ γ^k·(−1) = −1/(1−γ) = **−100**. Early episodes are very long, and if Q collapses to that plateau, all actions tie and the greedy policy loops.
+- **MC with α = 1/N**: Q is the mean of *every* return seen, including the −1500 returns of the first random episodes. In control the policy changes, so the target is **non-stationary** and old returns should be forgotten.
+  - Constant α fixes it (14/20 stuck seeds → 0/20).
+  - The class *online mean* is exact only for a fixed policy (prediction).
+- **Exploring starts** (class MC-ES): each episode starts at a random (s,a), so every pair keeps being tried, even with a bad policy.
+- **Double Q with α = 0.5**: each table gets half the updates, and 3/20 seeds collapse to −100. α = 0.1 → 0/20.

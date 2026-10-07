@@ -9,10 +9,12 @@ import time
 
 from tabular_rl import runner
 
-from . import exp1_main, exp2_compare_all, exp3_cliff_walking, exp4_optuna, exp5_training_analysis
+from . import (exp1_main, exp2_compare_all, exp3_cliff_walking, exp4_optuna, exp5_training_analysis,
+               exp6_failure_analysis)
 
 EXPERIMENTS = {"exp1": exp1_main, "exp2": exp2_compare_all, "exp3": exp3_cliff_walking,
-               "exp4": exp4_optuna, "exp5": exp5_training_analysis}
+               "exp4": exp4_optuna, "exp5": exp5_training_analysis,
+               "exp6": exp6_failure_analysis}
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
