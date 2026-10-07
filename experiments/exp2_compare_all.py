@@ -15,6 +15,7 @@ from .common import ALGOS, ENVS, save_table, summary_row, train_default
 
 
 def curves_figure(env_name, outs):
+    """Learning curves of every algorithm on one environment."""
     fig, ax = plt.subplots(1, 3, figsize=(17, 4.6), layout="constrained")
     cliff = env_name == "cliff_walking"
     for a, o in outs.items():
@@ -35,6 +36,7 @@ def curves_figure(env_name, outs):
 
 
 def policies_figure(env_name, outs):
+    """What each algorithm ends up believing: its values and greedy policy, next to the optimum."""
     spec = make_spec(env_name)
     cliff = env_name == "cliff_walking"
     fig, axes = plt.subplots(*(4, 2) if cliff else (2, 4), figsize=(14, 9) if cliff else (16, 6.5), layout="constrained")
@@ -48,6 +50,7 @@ def policies_figure(env_name, outs):
 
 
 def bars_figure(all_outs):
+    """Where every algorithm ends after training, all environments side by side."""
     metrics = [("match", "Optimal greedy actions (%)", 100, False),
                ("regret", "Regret of greedy policy at s0", 1, True),
                ("rmse_opt", "RMSE of Q on optimal actions", 1, True)]

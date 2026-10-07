@@ -19,6 +19,7 @@ W, H = Inches(13.333), Inches(7.5)
 
 
 def add_text(slide, text, left, top, width, height, size=18, bold=False, color=DARK):
+    """A text box. `text` can be one string or a list of lines."""
     box = slide.shapes.add_textbox(left, top, width, height)
     tf = box.text_frame
     tf.word_wrap = True
@@ -31,6 +32,7 @@ def add_text(slide, text, left, top, width, height, size=18, bold=False, color=D
 
 
 def slide(prs, title, subtitle=None):
+    """A blank slide with the orange top bar, a title and an optional subtitle."""
     s = prs.slides.add_slide(prs.slide_layouts[6])  # blank
     bar = s.shapes.add_shape(1, 0, 0, W, Inches(0.12))
     bar.fill.solid(); bar.fill.fore_color.rgb = ACCENT; bar.line.fill.background()
@@ -52,6 +54,7 @@ def picture(s, name, left, top, max_w, max_h):
 
 
 def bullets_and_figure(prs, title, subtitle, bullets, fig, split=0.32):
+    """The usual layout: bullet points on the left, a figure on the right."""
     s = slide(prs, title, subtitle)
     add_text(s, [f"• {b}" for b in bullets], Inches(0.5), Inches(1.6), int(W * split), Inches(5.5), size=16)
     picture(s, fig, int(W * split) + Inches(0.6), Inches(1.5), int(W * (1 - split)) - Inches(1.0), Inches(5.8))

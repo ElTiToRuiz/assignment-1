@@ -21,6 +21,7 @@ ENV = "gridworld_slippery"
 
 
 def alpha_sensitivity():
+    """Too small an alpha learns slowly, too large an alpha chases every noisy transition."""
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.3), layout="constrained")
     alphas = [0.01, 0.03, 0.1, 0.3, 0.6, 1.0]
     for algo in ["SARSA", "Q-learning"]:
@@ -39,6 +40,7 @@ def alpha_sensitivity():
 
 
 def exploration():
+    """Exploring more means worse returns now but better knowledge later. Decaying eps gets both."""
     schedules = {"constant ε=0.01": (0.01, 0.01, 1.0), "constant ε=0.1": (0.1, 0.1, 1.0),
                  "constant ε=0.3": (0.3, 0.3, 1.0), "decay 1 → 0.05": (1.0, 0.05, 0.998)}
     cmap = plt.get_cmap("plasma")
@@ -60,6 +62,8 @@ def exploration():
 
 
 def bias_variance():
+    """The slides' trade-off, measured: Monte Carlo targets real returns (unbiased but noisy), TD
+    bootstraps from its own estimates (biased early on, but much steadier)."""
     spec = make_spec(ENV)
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.3), layout="constrained")
     for algo in ["Monte Carlo", "SARSA", "Q-learning"]:
@@ -77,6 +81,7 @@ def bias_variance():
 
 
 def coverage():
+    """Once the agent knows the way, it rarely visits the rest of the grid, so those values stay rough."""
     spec = make_spec("gridworld_deterministic")
     fig, axes = plt.subplots(1, 2, figsize=(11, 3.8), layout="constrained")
     for a_, algo in zip(axes, ["SARSA", "Q-learning"]):
