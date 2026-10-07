@@ -230,11 +230,59 @@ This is the main hyper-parameter study. It is meant to run on a bigger machine (
   - a permutation test (default vs tuned);
   - PED-ANOVA parameter importance.
 
-Outputs:
-- `results/figures/exp4_pareto.png`
-- `exp4_default_vs_tuned.png`
-- `exp4_param_importance.png`
-- `results/tables/exp4_*.csv`
+**Results.** All 12 studies were run, 150 trials each, on a Windows machine (`run_server.bat`).
+
+![tuned](results/figures/exp4_default_vs_tuned.png)
+
+Default and tuned use the same training budget: 3000 episodes in the slippery gridworld, 500 in Cliff Walking. Both are evaluated on the 20 held-out seeds. In the tables, "speed" is the mean regret during training, "exact π\*" counts the seeds whose final greedy policy is exactly optimal, and p is the permutation test on speed.
+
+*Gridworld (slippery 80/10/10)*
+
+| Algorithm | Speed: default → tuned | p | Exact π\*: default → tuned | Tuned hyper-parameters |
+|---|---|---|---|---|
+| SARSA | 0.069 → 0.040 | 0.03 | 4 → 6 /20 | α = 0.011; ε 0.68 → 0.018 |
+| Expected SARSA | 0.034 → 0.020 | 0.02 | 4 → **11** /20 | α = 0.45 with decay k = 0.005; ε 0.12 → 0.002 |
+| Q-learning | 0.010 → **0.003** | <0.001 | 19 → **20** /20 | α = 0.49 with decay k = 0.05; ε 0.82 → 0.001 |
+| Double Q-learning | 0.073 → 0.016 | <0.001 | 10 → 13 /20 | α = 0.13 with decay k = 0.009; ε 0.88 → 0.13 |
+| n-step SARSA | 0.183 → 0.032 | <0.001 | 0 → **12** /20 | **n = 1**; α = 0.34 with decay k = 0.002 |
+| MC constant-α | 0.400 → 0.046 | <0.001 | 0 → 0 /20 | α = 0.016; ε 0.59 → 0.001 |
+
+*Cliff Walking*
+
+| Algorithm | Speed: default → tuned | p | Exact π\*: default → tuned | Tuned hyper-parameters |
+|---|---|---|---|---|
+| SARSA | 2.39 → 0.90 | <0.001 | 0 → 0 /20 | α = 0.25 with decay k = 0.005; ε 0.90 → 0.03 |
+| Expected SARSA | 0.86 → 0.54 | <0.001 | 0 → **18** /20 | α = 0.75; ε 0.07 → 0.002 (fast decay) |
+| Q-learning | 0.59 → **0.09** | <0.001 | 20 → 20 /20 | α = 0.96 with decay k = 0.03; ε 0.78 → **0.27** |
+| Double Q-learning | 3.53 → 0.67 | <0.001 | 0 → **12** /20 | α = 0.30; ε 0.81 → 0.07 |
+| n-step SARSA | 2.68 → 0.53 | <0.001 | 0 → 0 /20 | **n = 4**; α = 0.20 with decay k = 0.003 |
+| MC constant-α | 2.80 → 1.82 | <0.001 | 0 → 0 /20 | α = 0.076; ε 0.53 → 0.001 |
+
+The full numbers (95% CIs, exactness p-values) are in `results/tables/exp4_default_vs_tuned.csv`.
+
+**Findings:**
+1. **Tuning helps every algorithm.** Speed improves in all 12 cases: p < 0.05 in all of them and p < 0.001 in 10. The number of seeds that end exactly at π\* grows too:
+   - Expected SARSA in Cliff Walking: 0 → 18;
+   - n-step SARSA in the slippery world: 0 → 12;
+   - Double Q in Cliff Walking: 0 → 12.
+
+   Q-learning reaches π\* in 20/20 seeds in only 3000 episodes. The hand-made convergent schedule in `exp1` needed 30 000.
+2. **Optuna rediscovered the theory.** The Robbins–Monro step size α/(1+k·N(s,a)) was chosen in **8 of the 10** TD configurations, and almost every tuned schedule lets ε fall close to 0 (GLIE).
+3. **On-policy vs off-policy in Cliff Walking.**
+   - Expected SARSA (on-policy) only finds the optimal edge path (18/20 seeds) when ε decays quickly to ≈ 0. With exploration left on, its target keeps preferring the safe path (`exp3`).
+   - Q-learning (off-policy) is the opposite: Optuna keeps **ε_min = 0.27**, because exploration does not change what Q-learning learns (the greedy target). More exploration simply means more data.
+4. **n-step SARSA: the best n depends on the environment.**
+   - In the slippery world Optuna picks **n = 1**, i.e. plain SARSA: with noisy transitions, longer returns add variance.
+   - In the deterministic Cliff Walking it picks **n = 4**: the reward propagates faster along a long path, with no extra noise.
+5. **What matters** (`exp4_param_importance.png`): α or its decay for Q-learning and Double Q in the slippery world, and the ε schedule (half-life) for Expected SARSA and Double Q in Cliff Walking.
+6. **Honest caveats:**
+   - Each algorithm only gets 3000 (slippery) or 500 (Cliff) episodes here, fewer than in `exp2`. The default numbers in this table are therefore worse than in `exp2`, and this is a comparison at a **fixed budget**.
+   - Over-fitting to the 5 tuning seeds still shows. Tuned SARSA in the slippery world had a final regret of 0 on the tuning seeds but 0.03 on the held-out ones.
+   - On-policy methods that keep exploring (SARSA, n-step SARSA, MC in Cliff Walking) cannot reach the exact optimal path. That is a property of the algorithm, not a tuning failure.
+
+Other figures:
+- [`exp4_pareto.png`](results/figures/exp4_pareto.png): every trial with its Pareto front;
+- [`exp4_param_importance.png`](results/figures/exp4_param_importance.png): parameter importance.
 
 #### 4b. Preliminary study (SARSA and Q-learning, single objective)
 
@@ -310,7 +358,10 @@ A greedy regret of 3.46 is the safe path (17 steps instead of 13). Every on-poli
 3. Stochastic transitions need a decaying α and ε → 0 (Robbins–Monro + GLIE) for SARSA and Q-learning to reach π\* in every seed.
 4. TD bootstraps: low variance, biased. MC uses real returns: unbiased, high variance, and episodes must terminate.
 5. Expected SARSA reduces variance. Double Q-learning removes maximisation bias but learns more slowly.
-6. Hyper-parameters matter. Optuna more than halved the regret, but tuning must be validated on held-out seeds.
+6. Hyper-parameters matter.
+   - Multi-objective Optuna improved every algorithm significantly, and Q-learning reached π\* in 20/20 seeds with 10× fewer episodes.
+   - It independently chose the theory's convergence conditions: Robbins–Monro α and ε → 0.
+   - Tuning must still be validated on held-out seeds.
 7. The failures in Cliff Walking are explained by theory. Monte Carlo's 1/N mean cannot forget the first catastrophic returns (the target is non-stationary in control), and too large an α makes Double Q collapse to the −100 "never arrive" plateau. Constant-α MC, exploring starts and a smaller α fix both.
 
 Theory Q&A for the oral part: [`docs/THEORY.md`](docs/THEORY.md). Slides: [`docs/presentation.pptx`](docs/presentation.pptx).

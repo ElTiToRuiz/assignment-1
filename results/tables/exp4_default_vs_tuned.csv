@@ -1,0 +1,25 @@
+env,algorithm,config,hyper-parameters,speed (mean regret),95% CI,exactness (final regret),seeds exactly optimal,p-value speed (vs default),p-value exactness (vs default)
+Gridworld (slippery 80/10/10),SARSA,default,"{""alpha"": 0.1, ""eps"": [1.0, 0.05, 0.9995]}",0.0689,"[0.0646, 0.0733]",0.0719,4/20,,
+Gridworld (slippery 80/10/10),SARSA,tuned,"{""alpha"": 0.0114, ""eps"": [0.6803, 0.0176, 0.9498]}",0.0396,"[0.0170, 0.0688]",0.0303,6/20,0.0322,0.0205
+Gridworld (slippery 80/10/10),Expected SARSA,default,"{""alpha"": 0.1, ""eps"": [1.0, 0.05, 0.9995]}",0.0343,"[0.0323, 0.0364]",0.0353,4/20,,
+Gridworld (slippery 80/10/10),Expected SARSA,tuned,"{""alpha"": 0.4489, ""alpha_decay"": 0.0049, ""eps"": [0.1171, 0.002, 0.9907]}",0.0197,"[0.0092, 0.0318]",0.0137,11/20,0.0210,0.0601
+Gridworld (slippery 80/10/10),Q-learning,default,"{""alpha"": 0.1, ""eps"": [1.0, 0.05, 0.9995]}",0.0101,"[0.0093, 0.0109]",0.0041,19/20,,
+Gridworld (slippery 80/10/10),Q-learning,tuned,"{""alpha"": 0.4941, ""alpha_decay"": 0.0502, ""eps"": [0.8177, 0.0012, 0.9994]}",0.0028,"[0.0022, 0.0035]",0.0,20/20,0.0001,0.0085
+Gridworld (slippery 80/10/10),Double Q-learning,default,"{""alpha"": 0.1, ""eps"": [1.0, 0.05, 0.9995]}",0.0729,"[0.0625, 0.0828]",0.0762,10/20,,
+Gridworld (slippery 80/10/10),Double Q-learning,tuned,"{""alpha"": 0.127, ""alpha_decay"": 0.0088, ""eps"": [0.876, 0.1296, 0.9993]}",0.0158,"[0.0133, 0.0181]",0.0161,13/20,0.0001,0.0532
+Gridworld (slippery 80/10/10),n-step SARSA,default,"{""alpha"": 0.1, ""eps"": [1.0, 0.05, 0.9995], ""n"": 3}",0.1829,"[0.1766, 0.1892]",0.1149,0/20,,
+Gridworld (slippery 80/10/10),n-step SARSA,tuned,"{""alpha"": 0.34, ""alpha_decay"": 0.0017, ""eps"": [0.482, 0.0035, 0.9689], ""n"": 1}",0.0319,"[0.0207, 0.0434]",0.0105,12/20,0.0001,0.0001
+Gridworld (slippery 80/10/10),MC constant-α,default,"{""alpha"": 0.1, ""eps"": [1.0, 0.05, 0.9995]}",0.4004,"[0.3905, 0.4112]",0.2093,0/20,,
+Gridworld (slippery 80/10/10),MC constant-α,tuned,"{""alpha"": 0.0163, ""eps"": [0.5851, 0.0014, 0.9978]}",0.0455,"[0.0373, 0.0540]",0.0406,0/20,0.0001,0.0001
+Cliff Walking,SARSA,default,"{""alpha"": 0.5, ""eps"": [0.1, 0.1, 1.0]}",2.3933,"[2.1479, 2.6412]",1.528,0/20,,
+Cliff Walking,SARSA,tuned,"{""alpha"": 0.2497, ""alpha_decay"": 0.0051, ""eps"": [0.9014, 0.0302, 0.9794]}",0.8955,"[0.7992, 0.9916]",0.2823,0/20,0.0001,0.0001
+Cliff Walking,Expected SARSA,default,"{""alpha"": 0.5, ""eps"": [0.1, 0.1, 1.0]}",0.8601,"[0.8171, 0.9091]",0.1426,0/20,,
+Cliff Walking,Expected SARSA,tuned,"{""alpha"": 0.7543, ""alpha_decay"": 0.0001, ""eps"": [0.0716, 0.0017, 0.9382]}",0.5447,"[0.5097, 0.5803]",0.0143,18/20,0.0001,0.0001
+Cliff Walking,Q-learning,default,"{""alpha"": 0.5, ""eps"": [0.1, 0.1, 1.0]}",0.5895,"[0.5395, 0.6331]",0.0,20/20,,
+Cliff Walking,Q-learning,tuned,"{""alpha"": 0.9622, ""alpha_decay"": 0.0306, ""eps"": [0.7759, 0.2699, 0.9964]}",0.0865,"[0.0577, 0.1151]",0.0,20/20,0.0001,1.0000
+Cliff Walking,Double Q-learning,default,"{""alpha"": 0.5, ""eps"": [0.1, 0.1, 1.0]}",3.5263,"[2.3354, 4.9441]",1.6792,0/20,,
+Cliff Walking,Double Q-learning,tuned,"{""alpha"": 0.2982, ""eps"": [0.8112, 0.0677, 0.9968]}",0.6735,"[0.5641, 0.7899]",0.0991,12/20,0.0001,0.0001
+Cliff Walking,n-step SARSA,default,"{""alpha"": 0.5, ""eps"": [0.1, 0.1, 1.0], ""n"": 3}",2.6814,"[2.4599, 2.9247]",2.2606,0/20,,
+Cliff Walking,n-step SARSA,tuned,"{""alpha"": 0.2029, ""alpha_decay"": 0.0028, ""eps"": [0.8789, 0.0034, 0.9426], ""n"": 4}",0.5342,"[0.4741, 0.5949]",0.3438,0/20,0.0001,0.0001
+Cliff Walking,MC constant-α,default,"{""alpha"": 0.1, ""eps"": [0.1, 0.1, 1.0]}",2.7989,"[2.3292, 3.3181]",0.8041,0/20,,
+Cliff Walking,MC constant-α,tuned,"{""alpha"": 0.0758, ""eps"": [0.5334, 0.0013, 0.9901]}",1.8235,"[1.6594, 1.9895]",0.3781,0/20,0.0005,0.1806

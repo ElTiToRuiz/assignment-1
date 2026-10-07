@@ -112,13 +112,14 @@ def main():
 
     # 7. optuna: full multi-objective study if it has been run (experiments.tune), else the preliminary one
     if (FIG / "exp4_default_vs_tuned.png").exists():
-        bullets_and_figure(prs, "Hyper-parameter tuning with Optuna", "Multi-objective TPE: speed vs exactness, 6 algorithms x 2 environments", [
-            "Search: α, Robbins–Monro decay of α, ε schedule (start, min, half-life), n for n-step",
-            "Two objectives: mean regret during training (speed) and final regret (exactness) → Pareto front",
-            "Tuned on 5 seeds, compared on 20 held-out seeds",
-            "Bootstrap 95% CI + permutation test (* p<0.05)",
-            "See results/tables/exp4_default_vs_tuned.csv for the numbers",
-        ], "exp4_default_vs_tuned.png", split=0.28)
+        bullets_and_figure(prs, "Hyper-parameter tuning with Optuna", "Multi-objective TPE (speed vs exactness), 12 studies x 150 trials", [
+            "Speed better in all 12 cases (permutation test p<0.05, 10 with p<0.001, 20 held-out seeds)",
+            "Q-learning (slippery): 20/20 seeds optimal in 3000 episodes",
+            "Expected SARSA (Cliff): 0 → 18/20 optimal",
+            "Optuna rediscovered the theory: Robbins–Monro α in 8/10, ε → 0 (GLIE)",
+            "Cliff: Q-learning keeps ε=0.27 (off-policy), Expected SARSA needs ε→0 (on-policy)",
+            "n-step: n=1 with noisy transitions, n=4 in Cliff",
+        ], "exp4_default_vs_tuned.png", split=0.3)
     else:
         bullets_and_figure(prs, "Hyper-parameter tuning with Optuna", "TPE, 40 trials, objective = area under the regret curve", [
             "Tuned α and the ε schedule (start, min, decay) on 5 seeds",
@@ -138,6 +139,12 @@ def main():
         "• Expected SARSA lowers variance; Double Q removes maximisation bias but learns more slowly",
         "• Everything is reproducible: results cached; `uv run python -m experiments.run_all` redraws without training",
     ], Inches(0.7), Inches(1.4), Inches(12), Inches(5.5), size=20)
+
+    # backup: Optuna details
+    if (FIG / "exp4_pareto.png").exists():
+        s = slide(prs, "Backup: Optuna Pareto fronts and parameter importance", "Speed vs exactness trade-off; which hyper-parameters matter")
+        picture(s, "exp4_pareto.png", Inches(0.3), Inches(1.4), W - Inches(0.6), Inches(2.9))
+        picture(s, "exp4_param_importance.png", Inches(2.0), Inches(4.35), W - Inches(4.0), Inches(3.05))
 
     # backup: failure analysis
     bullets_and_figure(prs, "Backup: why MC and Double Q fail in Cliff Walking", "Estimates collapse to the −1/(1−γ) = −100 'never arrive' plateau", [

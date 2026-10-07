@@ -85,9 +85,9 @@ def pareto_figure(studies, envs, algos):
             for axis in (ax.xaxis, ax.yaxis):
                 axis.set_minor_formatter(NullFormatter())
             if i == len(envs) - 1:
-                ax.set_xlabel("speed: mean regret")
+                ax.set_xlabel("speed: mean regret (0 at 1e-5)")
             if j == 0:
-                ax.set_ylabel("exactness: final regret")
+                ax.set_ylabel("exactness: final regret (0 at 1e-5)")
     axes[0, 0].legend(fontsize=7, loc="lower right")
     fig.suptitle("Optuna multi-objective search (TPE): every trial, Pareto front, default and chosen configuration")
     save(fig, "exp4_pareto.png")

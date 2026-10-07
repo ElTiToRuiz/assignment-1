@@ -122,6 +122,11 @@ This works like a gradient step: it moves the estimate towards the Bellman targe
   - **bootstrap CI**: resample the 20 seed results with replacement 10 000 times and take the 2.5–97.5 percentiles of the mean;
   - **permutation test**: under H0 (default and tuned equally good) the labels are exchangeable, so shuffle them and count how often the difference is at least as large as the observed one.
 - **PED-ANOVA importance:** which hyper-parameters separate the good trials from the rest.
+- **What the full study found:**
+  - every algorithm improved significantly;
+  - Optuna picked the Robbins–Monro α in 8/10 TD configurations and ε → 0, i.e. the convergence conditions;
+  - in Cliff Walking, Q-learning keeps ε_min = 0.27, because off-policy learning is not hurt by exploring, while Expected SARSA needs ε → 0 to learn the optimal (edge) path;
+  - n-step: n = 1 with noisy transitions, n = 4 in deterministic Cliff Walking.
 
 ## 16. What goes beyond the class slides, and how it relates to them
 The assignment asks for "improvements/optimizations of seen algorithms". Each extra is a small change to something from class:

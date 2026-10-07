@@ -1,0 +1,71 @@
+env,algorithm,parameter,importance
+Gridworld (slippery 80/10/10),SARSA,alpha,0.432
+Gridworld (slippery 80/10/10),SARSA,use_alpha_decay,0.011
+Gridworld (slippery 80/10/10),SARSA,alpha_decay,0.0
+Gridworld (slippery 80/10/10),SARSA,eps_start,0.165
+Gridworld (slippery 80/10/10),SARSA,eps_min,0.22
+Gridworld (slippery 80/10/10),SARSA,eps_halflife,0.172
+Gridworld (slippery 80/10/10),Expected SARSA,alpha,0.063
+Gridworld (slippery 80/10/10),Expected SARSA,use_alpha_decay,0.002
+Gridworld (slippery 80/10/10),Expected SARSA,alpha_decay,0.135
+Gridworld (slippery 80/10/10),Expected SARSA,eps_start,0.347
+Gridworld (slippery 80/10/10),Expected SARSA,eps_min,0.051
+Gridworld (slippery 80/10/10),Expected SARSA,eps_halflife,0.402
+Gridworld (slippery 80/10/10),Q-learning,alpha,0.284
+Gridworld (slippery 80/10/10),Q-learning,use_alpha_decay,0.029
+Gridworld (slippery 80/10/10),Q-learning,alpha_decay,0.348
+Gridworld (slippery 80/10/10),Q-learning,eps_start,0.188
+Gridworld (slippery 80/10/10),Q-learning,eps_min,0.028
+Gridworld (slippery 80/10/10),Q-learning,eps_halflife,0.123
+Gridworld (slippery 80/10/10),Double Q-learning,alpha,0.066
+Gridworld (slippery 80/10/10),Double Q-learning,use_alpha_decay,0.055
+Gridworld (slippery 80/10/10),Double Q-learning,alpha_decay,0.616
+Gridworld (slippery 80/10/10),Double Q-learning,eps_start,0.039
+Gridworld (slippery 80/10/10),Double Q-learning,eps_min,0.182
+Gridworld (slippery 80/10/10),Double Q-learning,eps_halflife,0.043
+Gridworld (slippery 80/10/10),n-step SARSA,alpha,0.268
+Gridworld (slippery 80/10/10),n-step SARSA,use_alpha_decay,0.002
+Gridworld (slippery 80/10/10),n-step SARSA,alpha_decay,0.134
+Gridworld (slippery 80/10/10),n-step SARSA,eps_start,0.053
+Gridworld (slippery 80/10/10),n-step SARSA,eps_min,0.357
+Gridworld (slippery 80/10/10),n-step SARSA,eps_halflife,0.101
+Gridworld (slippery 80/10/10),n-step SARSA,n,0.085
+Gridworld (slippery 80/10/10),MC constant-α,alpha,0.359
+Gridworld (slippery 80/10/10),MC constant-α,eps_start,0.202
+Gridworld (slippery 80/10/10),MC constant-α,eps_min,0.181
+Gridworld (slippery 80/10/10),MC constant-α,eps_halflife,0.258
+Cliff Walking,SARSA,alpha,0.204
+Cliff Walking,SARSA,use_alpha_decay,0.0
+Cliff Walking,SARSA,alpha_decay,0.29
+Cliff Walking,SARSA,eps_start,0.156
+Cliff Walking,SARSA,eps_min,0.105
+Cliff Walking,SARSA,eps_halflife,0.245
+Cliff Walking,Expected SARSA,alpha,0.237
+Cliff Walking,Expected SARSA,use_alpha_decay,0.011
+Cliff Walking,Expected SARSA,alpha_decay,0.059
+Cliff Walking,Expected SARSA,eps_start,0.108
+Cliff Walking,Expected SARSA,eps_min,0.113
+Cliff Walking,Expected SARSA,eps_halflife,0.472
+Cliff Walking,Q-learning,alpha,0.307
+Cliff Walking,Q-learning,use_alpha_decay,0.0
+Cliff Walking,Q-learning,alpha_decay,0.347
+Cliff Walking,Q-learning,eps_start,0.165
+Cliff Walking,Q-learning,eps_min,0.111
+Cliff Walking,Q-learning,eps_halflife,0.068
+Cliff Walking,Double Q-learning,alpha,0.168
+Cliff Walking,Double Q-learning,use_alpha_decay,0.002
+Cliff Walking,Double Q-learning,alpha_decay,0.0
+Cliff Walking,Double Q-learning,eps_start,0.258
+Cliff Walking,Double Q-learning,eps_min,0.183
+Cliff Walking,Double Q-learning,eps_halflife,0.388
+Cliff Walking,n-step SARSA,alpha,0.395
+Cliff Walking,n-step SARSA,use_alpha_decay,0.032
+Cliff Walking,n-step SARSA,alpha_decay,0.003
+Cliff Walking,n-step SARSA,eps_start,0.083
+Cliff Walking,n-step SARSA,eps_min,0.14
+Cliff Walking,n-step SARSA,eps_halflife,0.019
+Cliff Walking,n-step SARSA,n,0.329
+Cliff Walking,MC constant-α,alpha,0.248
+Cliff Walking,MC constant-α,eps_start,0.349
+Cliff Walking,MC constant-α,eps_min,0.141
+Cliff Walking,MC constant-α,eps_halflife,0.262
