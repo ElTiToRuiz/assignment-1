@@ -40,26 +40,43 @@ Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `
 
 ### Training on another machine
 
-Everything heavy is cached, so the workflow is: train once on a big machine, commit the results, and redraw anywhere in seconds.
+Everything heavy is cached, so the workflow is: train once on a big machine, commit the results, and redraw anywhere in seconds. CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) checks on **Windows and Linux** that:
+- the tests pass;
+- the figures can be redrawn from the cache;
+- the Optuna pipeline runs.
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh   # if uv is not installed
-git clone git@github.com:ElTiToRuiz/assignment-1.git && cd assignment-1
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # install uv (once), then reopen the terminal
+git clone https://github.com/ElTiToRuiz/assignment-1.git; cd assignment-1
 uv sync
-uv run pytest -q                                      # sanity check (~2 s)
-uv run python -m experiments.tune --quick --storage /tmp/smoke.db   # 10-second smoke test of the pipeline
+uv run pytest -q                                                    # sanity check (~2 s)
+uv run python -m experiments.tune --quick --storage smoke\studies.db # 10-second smoke test
 
 # 1) Optuna: 12 studies x 150 trials x 5 seeds (~1-3 s per trial).
-#    About 1-1.5 CPU-hours: ~10-15 min with 8 cores. Resumable: if it stops, run it again.
-# (on macOS use $(sysctl -n hw.ncpu) instead of $(nproc))
-nohup uv run python -m experiments.tune --workers $(nproc) > tune.log 2>&1 &
+#    About 1-1.5 CPU-hours: ~10-15 min with 8 cores. Resumable: if it stops, run the same command again.
+uv run python -m experiments.tune --workers $env:NUMBER_OF_PROCESSORS *>&1 | Tee-Object tune.log
 
 # 2) Evaluate the tuned configurations on 20 held-out seeds and redraw every figure
-#    (RL_JOBS = parallel processes for the seeds, default min(20, #cores))
-RL_JOBS=$(nproc) uv run python -m experiments.run_all
+$env:RL_JOBS = $env:NUMBER_OF_PROCESSORS
+uv run python -m experiments.run_all
 uv run python docs/make_slides.py
 
 # 3) Save the results
+git add results docs; git commit -m "Optuna study results"; git push
+```
+
+On Windows, keep the PowerShell window open while it runs. If it closes, just rerun the same `tune` command: it resumes.
+
+**Linux / macOS:**
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+git clone https://github.com/ElTiToRuiz/assignment-1.git && cd assignment-1
+uv sync && uv run pytest -q
+nohup uv run python -m experiments.tune --workers $(nproc) > tune.log 2>&1 &   # macOS: $(sysctl -n hw.ncpu)
+RL_JOBS=$(nproc) uv run python -m experiments.run_all && uv run python docs/make_slides.py
 git add results docs && git commit -m "Optuna study results" && git push
 ```
 

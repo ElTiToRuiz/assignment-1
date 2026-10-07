@@ -41,6 +41,8 @@ TUNE_SEEDS = [100, 101, 102, 103, 104]  # disjoint from the evaluation seeds 0..
 # Fixed training budget per environment during tuning (and for the default-vs-tuned comparison).
 BUDGET = {"gridworld_slippery": 3000, "cliff_walking": 500, "gridworld_deterministic": 300}
 ENVS = ["gridworld_slippery", "cliff_walking"]
+# Windows cannot wait on more than 61 processes in one pool
+MAX_WORKERS = min(os.cpu_count() or 1, 61)
 ALGOS = ["SARSA", "Expected SARSA", "Q-learning", "Double Q-learning", "n-step SARSA", "MC constant-α"]
 
 
@@ -115,8 +117,10 @@ def _worker(args):
 
 
 def storage_url(path):
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    return optuna.storages.RDBStorage(f"sqlite:///{path}", engine_kwargs={"connect_args": {"timeout": 60}})
+    path = Path(path).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # as_posix(): forward slashes, so Windows paths (C:\...) also form a valid SQLAlchemy URL
+    return optuna.storages.RDBStorage(f"sqlite:///{path.as_posix()}", engine_kwargs={"connect_args": {"timeout": 120}})
 
 
 def chosen_trial(study):
@@ -142,7 +146,7 @@ def run(envs, algos, trials, workers, storage_path, seeds, quick=False):
                 print(f"  [optuna] {env:20s} {algo:18s} already has {done} trials")
                 continue
             t0 = time.time()
-            n_w = min(workers, todo)
+            n_w = max(1, min(workers, todo, MAX_WORKERS))
             shares = [todo // n_w + (i < todo % n_w) for i in range(n_w)]
             jobs = [(storage_path, env, algo, k, seeds, n_episodes, 1000 * done + i) for i, k in enumerate(shares)]
             print(f"  [optuna] {env:20s} {algo:18s} {todo} trials x {len(seeds)} seeds, {n_w} workers ...",
@@ -162,7 +166,7 @@ if __name__ == "__main__":
     p.add_argument("--envs", nargs="+", default=ENVS, choices=list(BUDGET))
     p.add_argument("--algos", nargs="+", default=ALGOS, choices=ALGOS)
     p.add_argument("--trials", type=int, default=150, help="finished trials per study (resumes up to this)")
-    p.add_argument("--workers", type=int, default=os.cpu_count() or 1, help="parallel processes")
+    p.add_argument("--workers", type=int, default=MAX_WORKERS, help=f"parallel processes (max {MAX_WORKERS})")
     p.add_argument("--storage", default=str(STORAGE), help="SQLite file with the studies")
     p.add_argument("--quick", action="store_true", help="smoke test: 4 trials, 2 seeds, 150 episodes")
     a = p.parse_args()

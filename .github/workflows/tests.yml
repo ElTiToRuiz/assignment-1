@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+      SDL_VIDEODRIVER: dummy  # pygame without a display
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies
+        run: uv sync
+      - name: Unit tests
+        run: uv run pytest -q
+      - name: Redraw every figure from the cache (no training)
+        run: uv run python -m experiments.run_all
+      - name: Optuna pipeline smoke test (multi-process, SQLite)
+        run: uv run python -m experiments.tune --quick --workers 2 --storage smoke/studies.db --envs cliff_walking --algos SARSA "MC constant-α"
+      - name: Demo with a saved model (terminal)
+        run: uv run python -m experiments.demo --render ansi --episodes 1

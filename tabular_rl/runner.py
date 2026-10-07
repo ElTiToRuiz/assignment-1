@@ -113,7 +113,7 @@ def train(algo, env_name, seeds, n_jobs=1, **kw):
     out = run_many(algo, make_spec(env_name), list(seeds), n_jobs=n_jobs, **kw)
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(path, **{k: _compact(v) for k, v in out.items()})
-    path.with_suffix(".json").write_text(json.dumps(
+    path.with_suffix(".json").write_text(encoding="utf-8", data=json.dumps(
         {"config": json.loads(cfg), "train_seconds": round(time.time() - t0, 1)}, indent=2))
     _TRAINED_NOW.add(path)
     print(f" {time.time() - t0:5.1f}s")

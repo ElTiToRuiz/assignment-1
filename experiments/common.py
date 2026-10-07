@@ -9,7 +9,8 @@ from tabular_rl.runner import train
 
 SEEDS = list(range(20))
 # parallel processes for training seeds; override with RL_JOBS=<n> (e.g. on a bigger machine)
-N_JOBS = int(os.environ.get("RL_JOBS", min(20, os.cpu_count() or 1)))
+# (capped at 61: the Windows limit for a process pool)
+N_JOBS = min(61, int(os.environ.get("RL_JOBS", min(20, os.cpu_count() or 1))))
 LOG_EVERY = 10  # Q snapshot every 10 episodes (agents' default)
 TABLES = Path(__file__).resolve().parent.parent / "results" / "tables"
 
