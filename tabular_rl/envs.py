@@ -7,13 +7,11 @@ The agents never read P directly. They only play the environment through `Simula
 they would with the class GridworldEnv. We keep P around for two things only: computing the true
 optimum with dynamic programming, and grading the learned policies exactly.
 """
-import os
 from dataclasses import dataclass, field
 
 import numpy as np
 
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")  # the class env imports pygame, which is chatty
-from class_code.env import GridworldEnv
+from .class_gridworld import GridworldEnv
 
 # Same action numbering as the class env.
 ACTIONS = {0: (0, -1), 1: (1, 0), 2: (0, 1), 3: (-1, 0)}  # LEFT, DOWN, RIGHT, UP

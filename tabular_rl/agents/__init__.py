@@ -4,7 +4,6 @@ ALGORITHMS maps the names used in the experiments (and in the cache files) to th
 """
 from functools import partial
 
-from .base import RunResult, epsilon_at, epsilon_greedy, greedy_action, step_size
 from .monte_carlo import monte_carlo
 from .q_learning import double_q_learning, q_learning
 from .sarsa import expected_sarsa, n_step_sarsa, sarsa

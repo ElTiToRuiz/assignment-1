@@ -1,9 +1,9 @@
 """Quick checks (about 2 s): the ground truth is right, the agents learn, and the tooling works."""
 import numpy as np
 
-from class_code.env import GridworldEnv
 from tabular_rl import models, training
 from tabular_rl.agents import ALGORITHMS, expected_sarsa, q_learning
+from tabular_rl.class_gridworld import GridworldEnv
 from tabular_rl.envs import greedy_path, make_spec
 from tabular_rl.planning import evaluate_policy, policy_iteration, value_iteration
 from tabular_rl.simulator import Simulator

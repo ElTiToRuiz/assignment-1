@@ -8,7 +8,7 @@ Reinforcement Learning, Universidad de Deusto. **SARSA and Q-learning** on the c
 - **Optuna** hyper-parameter tuning;
 - a deeper **analysis of the training process**.
 
-All results are **cached**: the plots and tables are regenerated in a few seconds without training.
+Every figure and table in `results/` is committed. Training is seeded and deterministic, so rerunning reproduces exactly the same numbers.
 
 ---
 
@@ -23,26 +23,24 @@ uv sync                                           # creates .venv with the locke
 
 Every command below runs through `uv run`, so there is no need to activate the virtual environment.
 
-Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `pytest` (tests). The slides are built with Node.js (`pptxgenjs`), only needed to rebuild them.
+Libraries beyond the ones used in class: `optuna` (tuning), `pandas` (tables), `pytest` (tests).
 
 ## How to run
 
 | Command | What it does |
 |---|---|
-| `uv run python -m experiments.run_all` | Rebuilds every figure and table **from the cache** (~10 s, no training) |
-| `uv run python -m experiments.run_all --retrain` | Trains everything again from scratch (~15 min on 8 cores) |
+| `uv run python -m experiments.run_all` | Trains everything and redraws every figure and table (~20 min on 8 cores the first time; it keeps a local cache in `results/cache/`, so later runs take seconds) |
 | `uv run python -m experiments.run_all --only exp1 exp3` | Runs only some experiments |
 | `uv run python -m experiments.demo` | Loads a **saved model** (Q-table) and plays it in the class pygame `GridworldEnv` |
 | `uv run python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3` | Same, in the terminal |
-| `cd docs/presentation && npm install && npm run build` | Builds `docs/presentation.pptx` (the 5-minute talk + backup slides) from the results. Needs Node.js |
 | `uv run python -m experiments.tune` | Optuna hyper-parameter search (about 1 CPU-hour; resumable, so it can be stopped and rerun). `--quick` checks it works in seconds |
 | `uv run pytest -q` | Runs the tests (DP ground truth, policy iteration = value iteration, env equivalence, convergence, Expected SARSA = Q-learning at ε=0, cache, statistics, search space) |
 
 ## Repository layout
 
 ```
-class_code/              env.py + tools.py from class (the GridworldEnv)
 tabular_rl/              the library
+  class_gridworld.py     the GridworldEnv from class, copied as it was
   envs.py                the environments (class gridworld, Cliff Walking) in the class P format
   simulator.py           plays an environment step by step: all the agents ever see
   planning.py            value / policy iteration and exact policy evaluation (the answer key)
@@ -52,24 +50,23 @@ tabular_rl/              the library
     sarsa.py             SARSA, Expected SARSA, n-step SARSA (on-policy)
     q_learning.py        Q-learning, Double Q-learning (off-policy)
   metrics.py             how a Q-table is graded against Q*
-  training.py            many seeds in parallel + the disk cache
+  training.py            many seeds in parallel + a local cache, so nothing is trained twice
   models.py              save / load Q-tables
   plotting.py            figure style and the shared plots
   stats.py               bootstrap confidence intervals and permutation test
 experiments/             exp1 ... exp6, tune.py (Optuna), run_all.py, demo.py
 results/
-  cache/                 training results (.npz) with a readable .json next to each
   optuna/                the Optuna studies (SQLite)
-  models/                final Q-table per environment x algorithm (.npy)
+  models/                final gridworld Q-tables, one per algorithm (.npy), used by the demo
   figures/, tables/      everything shown below
-docs/                    presentation.pptx (+ presentation/build.js that makes it), THEORY.md (notes for the oral part)
+docs/                    presentation.pptx (the 5-minute talk + backup slides), THEORY.md (notes for the oral part)
 tests/
 ```
 
 ## Method
 
 - **Environments**:
-  - **Gridworld 3x4** from class (`class_code/env.py`): +1 goal, −1 pit, one wall. Deterministic or slippery (80% intended move, 10% each perpendicular).
+  - **Gridworld 3x4** from class (`tabular_rl/class_gridworld.py`): +1 goal, −1 pit, one wall. Deterministic or slippery (80% intended move, 10% each perpendicular).
   - **Cliff Walking 4x12** (Sutton & Barto): −1 per step; −100 and back to the start on the cliff.
   - Both are written in the same `P[s][a] = [(prob, s', r, done)]` format.
 - **Model-free agents**: they only use `reset()` / `step()`. The model `P` is used **only** by value iteration, to get the ground truth Q\*, and by exact policy evaluation, for the metrics.
@@ -141,7 +138,7 @@ RMSE over *all* actions stays high in the deterministic world. Once the agent ha
 
 ![bars](results/figures/exp2_summary_bars.png)
 
-Per-environment curves and policies are in `results/figures/exp2_curves_*.png` and `exp2_policies_*.png`. The full table is in `results/tables/exp2_all_algorithms.csv`.
+The full table is in `results/tables/exp2_all_algorithms.csv`.
 
 - **Q-learning** gives the most accurate Q\* and the lowest regret in all 3 environments.
 - **Expected SARSA** is the best on-policy method: it has lower variance than SARSA and the best online return in Cliff Walking (−19.9).

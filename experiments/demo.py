@@ -5,12 +5,10 @@ results/models/ and always takes the greedy action.
     uv run python -m experiments.demo --env gridworld_slippery --algo SARSA --render ansi --episodes 3
 """
 import argparse
-import os
 import time
 
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")  # pygame prints a banner on import otherwise
-from class_code.env import GridworldEnv
 from tabular_rl.agents import ALGORITHMS
+from tabular_rl.class_gridworld import GridworldEnv
 from tabular_rl.envs import ARROWS
 from tabular_rl.models import load_model
 

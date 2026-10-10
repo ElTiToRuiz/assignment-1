@@ -1,3 +1,13 @@
+"""The GridworldEnv we were given in class, copied as it was.
+
+We only use it for two things: its transition table P (our environments are built from it) and
+its rendering, so the demo can show a trained agent in the same window as in class. The usage
+example that came at the bottom of the original file has been left out.
+"""
+import os
+
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")  # pygame prints a banner on import otherwise
+
 import numpy as np
 import pygame
 
@@ -307,71 +317,3 @@ class GridworldEnv:
         if self.window is not None:
             pygame.quit()
             self.window = None  # Reset window handle
-
-if __name__ == "__main__":
-    import time
-    from class_code import tools
-
-    # 1. custom env with pygame render
-    env = GridworldEnv(render_mode="human")
-    obs, info = env.reset()
-
-    done = False
-    while not done:
-        action = np.random.choice(env.n_actions)
-        obs, reward, terminated, truncated, info = env.step(action)
-        done = terminated or truncated
-
-    time.sleep(1)
-    env.close()
-    tools.plot_environment(env)
-    
-
-    # # 2. custom env with ANSI render
-    # env = GridworldEnv(render_mode="ansi")
-    # obs, info = env.reset()
-    #
-    # done = False
-    # while not done:
-    #     print(env.render())
-    #     time.sleep(0.2)
-    #     action = np.random.choice(env.n_actions)
-    #     obs, reward, terminated, truncated, info = env.step(action)
-    #     done = terminated or truncated
-    # tools.plot_environment(env)
-
-    # # 3. gymnasium frozenlake with human render
-    # import gymnasium as gym
-    # env = gym.make("FrozenLake-v1", render_mode="human")
-    #
-    # obs, info = env.reset()
-    # terminated = False
-    # truncated = False
-    # step_count = 0
-    #
-    # while not (terminated or truncated) and step_count < 10:
-    #     action = env.action_space.sample()  # Take random Gymnasium action
-    #     next_obs, reward, terminated, truncated, info = env.step(action)
-    #     step_count += 1
-    #
-    # env.close()
-    # tools.plot_environment(env)
-
-    # # 4. gymnasium frozenlake with ANSI render
-    # import gymnasium as gym
-    # env = gym.make("FrozenLake-v1", render_mode="ansi")
-    #
-    # obs, info = env.reset()
-    # terminated = False
-    # truncated = False
-    # step_count = 0
-    #
-    # while not (terminated or truncated) and step_count < 10:
-    #     print(env.render())
-    #     action = env.action_space.sample()  # Take random Gymnasium action
-    #     next_obs, reward, terminated, truncated, info = env.step(action)
-    #     env.render()
-    #     step_count += 1
-    #
-    # env.close()
-    # tools.plot_environment(env)
