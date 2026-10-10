@@ -66,9 +66,8 @@ def _cache_key(algo, env_name, seeds, kw):
 
 
 def _shrink(a):
-    """float32 is plenty for plotting and halves the size of the cache."""
-    if a.dtype == np.float64 and a.size > 1000:
-        return a.astype(np.float32)
+    """Integers as int32 to save some space. Floats stay at full precision, so a table computed
+    from the cache is identical to one computed right after training."""
     if a.dtype.kind in "iu":
         return a.astype(np.int32)
     return a

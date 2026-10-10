@@ -242,7 +242,7 @@ En el cliff cada paso cuesta −1, así que con γ = 0,99 una política que **nu
 | Double Q-learning, α = 0,5 | **3/20** | −25,1 (media −221) | 3,46 |
 | Double Q-learning, α = 0,1 | 0/20 | −26,1 | 3,46 |
 | SARSA, α = 0,5 (referencia) | 0/20 | −24,4 | 3,46 |
-| Q-learning, α = 0,5 (referencia) | 0/20 | −50,7 | **0,00** |
+| Q-learning, α = 0,5 (referencia) | 0/20 | −50,6 | **0,00** |
 
 \* Con exploring starts los episodios empiezan en estados aleatorios, así que este retorno no es comparable con los demás.
 
