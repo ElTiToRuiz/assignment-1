@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabular Reinforcement Learning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ------------------------------------------------------------------ tokens */
+  :root {
+    --navy: #0f1b2d;
+    --navy-2: #16243a;
+    --cell-dark: #1c2c45;
+    --wall-dark: #33445e;
+    --ink: #0f1b2d;
+    --muted: #55617a;
+    --soft: #eef2f6;
+    --line: #dfe5ee;
+    --paper: #ffffff;
+    --ice: #cadcfc;
+    --q: #d55e00;      /* Q-learning */
+    --sarsa: #0072b2;  /* SARSA */
+    --exp: #009e73;    /* Expected SARSA, goal */
+    --dq: #e69f00;     /* Double Q, the agent */
+    --nstep: #56b4e9;  /* n-step SARSA */
+    --mc: #7a7a7a;     /* Monte Carlo */
+    --head: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #070d17;
+    font-family: var(--body);
+    color: var(--ink);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ------------------------------------------------------------------ stage: a 1280x720 canvas scaled to the window */
+  #stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1280px; height: 720px;
+    transform-origin: center center;
+  }
+  .slide {
+    position: absolute; inset: 0;
+    padding: 56px 64px 48px;
+    background: var(--paper);
+    border-radius: 6px;
+    overflow: hidden;
+    opacity: 0; visibility: hidden;
+    transform: translateX(28px);
+    transition: opacity .45s ease, transform .45s ease, visibility 0s linear .45s;
+  }
+  .slide.active { opacity: 1; visibility: visible; transform: none; transition: opacity .45s ease, transform .45s ease; }
+  .slide.before { transform: translateX(-28px); }
+  .slide.dark { background: radial-gradient(1200px 700px at 85% 20%, #1a2d4a 0%, var(--navy) 60%); color: #fff; }
+
+  /* every content element rises in when its slide becomes active */
+  .slide .rise { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
+  .slide.active .rise { opacity: 1; transform: none; }
+  .slide.active .rise.d1 { transition-delay: .08s; } .slide.active .rise.d2 { transition-delay: .16s; }
+  .slide.active .rise.d3 { transition-delay: .24s; } .slide.active .rise.d4 { transition-delay: .32s; }
+  .slide.active .rise.d5 { transition-delay: .40s; }
+
+  h1, h2, h3 { font-family: var(--head); letter-spacing: -0.01em; }
+  h2.title { font-size: 40px; font-weight: 700; line-height: 1.1; margin-bottom: 28px; }
+  .kicker { font-size: 14px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .dark .kicker { color: #8a9bb5; }
+  .footer { position: absolute; left: 64px; right: 64px; bottom: 20px; display: flex; justify-content: space-between; font-size: 12px; color: #8a94a8; }
+  .dark .footer { color: #6c7d99; }
+
+  /* ------------------------------------------------------------------ the motif: gridworld cells */
+  .grid { display: grid; gap: var(--gap, 12px); grid-template-columns: repeat(var(--cols, 4), var(--cell, 100px)); position: relative; }
+  .grid .c { width: var(--cell, 100px); height: var(--cell, 100px); border-radius: calc(var(--cell, 100px) * .18); background: var(--soft);
+             display: grid; place-items: center; font-family: var(--head); font-weight: 700; color: #fff; font-size: calc(var(--cell, 100px) * .26); }
+  .dark .grid .c { background: var(--cell-dark); }
+  .grid .goal { background: var(--exp) !important; }
+  .grid .pit { background: var(--q) !important; }
+  .grid .wall { background: #c5ceda !important; }
+  .dark .grid .wall { background: var(--wall-dark) !important; }
+  .grid .start { background: var(--dq) !important; }
+  .grid .cliff { background: var(--q) !important; }
+
+  .agent { position: absolute; width: calc(var(--cell) * .5); height: calc(var(--cell) * .5); border-radius: 50%;
+           background: var(--dq); box-shadow: 0 0 0 6px rgba(230,159,0,.18), 0 0 30px rgba(230,159,0,.45);
+           left: calc(var(--cell) * .25); top: calc(var(--cell) * .25); }
+  .slide.active .agent.walk { animation: walk 7s ease-in-out infinite; }
+  @keyframes walk {   /* up, up, right, right, right: the optimal path */
+    0%, 8%   { transform: translate(0, calc(2 * var(--step))); }
+    20%      { transform: translate(0, var(--step)); }
+    32%      { transform: translate(0, 0); }
+    44%      { transform: translate(var(--step), 0); }
+    56%      { transform: translate(calc(2 * var(--step)), 0); }
+    68%, 88% { transform: translate(calc(3 * var(--step)), 0) scale(.85); }
+    100%     { transform: translate(0, calc(2 * var(--step))); }
+  }
+  .path { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .path polyline { fill: none; stroke: rgba(255,255,255,.65); stroke-width: 3; stroke-dasharray: 9 9; stroke-linecap: round; }
+  .slide.active .path polyline { animation: dash 1.6s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -36; } }
+
+  /* ------------------------------------------------------------------ building blocks */
+  .row { display: flex; gap: 32px; }
+  .col { display: flex; flex-direction: column; }
+  .panel { background: var(--soft); border-radius: 18px; padding: 26px 28px; }
+  .card { background: var(--soft); border-radius: 18px; padding: 22px 24px; }
+  .figure { border-radius: 14px; overflow: hidden; background: #fff; box-shadow: 0 1px 2px rgba(15,27,45,.06), 0 10px 30px rgba(15,27,45,.10); }
+  .figure img { display: block; width: 100%; height: auto; }
+
+  .icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; flex: none; }
+  .icon svg { width: 28px; height: 28px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .badge { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: #fff;
+           font-family: var(--head); font-weight: 700; font-size: 20px; flex: none; }
+
+  .stat .big { font-family: var(--head); font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+  .stat .cap { font-size: 16px; color: var(--muted); margin-top: 8px; line-height: 1.35; }
+
+  .item { display: flex; gap: 16px; align-items: flex-start; }
+  .item h3 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .item p { font-size: 16px; color: var(--muted); line-height: 1.4; }
+  .dark .item p { color: #b8c4d8; }
+
+  .env-list .item h3 { font-size: 23px; } .env-list .item p { font-size: 17px; }
+  .quote { font-size: 17px; font-style: italic; color: var(--muted); line-height: 1.45; }
+
+  /* ------------------------------------------------------------------ hand-made bar charts */
+  .chart { position: relative; }
+  .chart .plot { position: relative; height: 100%; display: flex; align-items: flex-end; gap: 22px; padding: 0 6px 0 46px; border-bottom: 1.5px solid #b9c3d1; }
+  .chart .tick { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); font-size: 12px; color: #8a94a8; }
+  .chart .tick span { position: absolute; left: 0; top: -9px; width: 38px; text-align: right; }
+  .chart .group { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 4px; height: 100%; position: relative; }
+  .chart .bar { flex: 1; max-width: 38px; border-radius: 6px 6px 2px 2px; transform-origin: bottom; transform: scaleY(0);
+                transition: transform .9s cubic-bezier(.2,.8,.2,1); position: relative; }
+  .slide.active .chart .bar { transform: scaleY(1); }
+  .chart .bar:hover::after { content: attr(data-v); position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -6px);
+                             background: var(--navy); color: #fff; font-size: 12px; padding: 3px 7px; border-radius: 6px; white-space: nowrap; }
+  .chart .label { position: absolute; bottom: -28px; left: -10px; right: -10px; text-align: center; font-size: 13px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+  .chart .ctitle { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  table.t { border-collapse: separate; border-spacing: 0; font-size: 18px; width: 100%; }
+  table.t th { background: var(--navy); color: #fff; font-weight: 600; padding: 14px 18px; text-align: center; }
+  table.t th:first-child { text-align: left; border-top-left-radius: 12px; } table.t th:last-child { border-top-right-radius: 12px; }
+  table.t td { padding: 14px 18px; text-align: center; border-bottom: 1px solid var(--line); }
+  table.t td:first-child { text-align: left; font-weight: 500; }
+  table.t tr:nth-child(even) td { background: var(--soft); }
+  table.t .hl { color: var(--q); font-weight: 700; }
+
+  /* ------------------------------------------------------------------ chrome: progress, counter, notes, help */
+  #progress { position: fixed; left: 0; top: 0; height: 3px; background: var(--q); transition: width .35s ease; z-index: 10; }
+  #counter { position: fixed; right: 18px; bottom: 14px; font: 500 13px var(--body); color: #8a9bb5; z-index: 10; }
+  #help { position: fixed; left: 18px; bottom: 14px; font: 13px var(--body); color: #8a9bb5; z-index: 10; transition: opacity 1s ease; }
+  #help kbd { background: #1c2c45; color: #cadcfc; border-radius: 4px; padding: 1px 6px; font-family: var(--body); }
+  #notes { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); width: min(900px, 92vw); max-height: 40vh; overflow: auto;
+           background: rgba(15,27,45,.96); color: #e6edf7; border: 1px solid #2a3b57; border-radius: 14px; padding: 18px 22px;
+           font-size: 17px; line-height: 1.5; box-shadow: 0 20px 60px rgba(0,0,0,.5); display: none; z-index: 20; }
+  #notes.show { display: block; }
+  #notes b { color: var(--dq); }
+  aside.notes { display: none; }
+
+  /* ------------------------------------------------------------------ print: one slide per page */
+  @media print {
+    @page { size: 1280px 720px; margin: 0; }
+    body { background: #fff; overflow: visible; }
+    #stage { position: static; transform: none !important; }
+    .slide { position: relative; opacity: 1; visibility: visible; transform: none; page-break-after: always; border-radius: 0; }
+    .slide .rise, .chart .bar { opacity: 1; transform: none; transition: none; }
+    #progress, #counter, #help, #notes { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="stage">
+
+<!-- 1 · Title ============================================================== -->
+<section class="slide dark">
+  <div class="row" style="height:100%; align-items:center; gap:60px">
+    <div class="col" style="flex:1">
+      <div class="kicker rise">Reinforcement Learning · Assignment 1</div>
+      <h1 class="rise d1" style="font-size:68px; line-height:1.02; font-weight:700">Tabular<br>Reinforcement<br>Learning</h1>
+      <p class="rise d2" style="font-size:24px; color:var(--ice); margin-top:22px; line-height:1.35">SARSA vs Q-learning, and what it<br>takes to make them converge</p>
+      <p class="rise d3" style="font-size:18px; font-weight:600; margin-top:48px">Igor Ruiz · Andoni Garrido</p>
+      <p class="rise d3" style="font-size:14px; color:#8a9bb5; margin-top:6px">Universidad de Deusto · October 2026</p>
+    </div>
+    <div class="rise d2" style="position:relative">
+      <div class="grid" style="--cell:112px; --gap:14px; --step:126px">
+        <div class="c"></div><div class="c"></div><div class="c"></div><div class="c goal">+1</div>
+        <div class="c"></div><div class="c wall"></div><div class="c"></div><div class="c pit">−1</div>
+        <div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div>
+        <svg class="path" viewBox="0 0 490 364"><polyline points="56,308 56,182 56,56 182,56 308,56 364,56"/></svg>
+        <div class="agent walk" style="--cell:112px; --step:126px"></div>
+      </div>
+      <p style="text-align:left; font-size:13px; color:#8a9bb5; margin-top:12px">start ↑ · the dashed line is the optimal path</p>
+    </div>
+  </div>
+  <aside class="notes">(~15 s) We implemented SARSA and Q-learning for the class gridworld, deterministic and slippery, and then asked: why do they behave differently, and what makes them converge? On the right is the class grid: the agent starts bottom-left and follows the optimal path to +1, avoiding the −1 pit.</aside>
+</section>
+
+<!-- 2 · Setup ============================================================== -->
+<section class="slide">
+  <h2 class="title rise">Three environments, one honest yardstick</h2>
+  <div class="row" style="gap:40px">
+    <div class="col env-list" style="flex:1.1; gap:44px; padding-top:14px">
+      <div class="item rise d1">
+        <div class="grid" style="--cell:34px; --gap:5px; flex:none">
+          <div class="c"></div><div class="c"></div><div class="c"></div><div class="c goal"></div>
+          <div class="c"></div><div class="c wall"></div><div class="c"></div><div class="c pit"></div>
+          <div class="c start"></div><div class="c"></div><div class="c"></div><div class="c"></div>
+        </div>
+        <div style="margin-left:10px"><h3>Gridworld · deterministic</h3><p>The 3×4 grid from class: +1 goal, −1 pit, one wall.</p></div>
+      </div>
+      <div class="item rise d2">
+        <div class="grid" style="--cell:34px; --gap:5px; flex:none">
+          <div class="c"></div><div class="c"></div><div class="c"></div><div class="c goal"></div>
+          <div class="c"></div><div class="c wall"></div><div class="c"></div><div class="c pit"></div>
+          <div class="c start"></div><div class="c"></div><div class="c"></div><div class="c"></div>
+        </div>
+        <div style="margin-left:10px"><h3>Gridworld · slippery</h3><p>80% the intended move, 10% to each side. Every update becomes noisy.</p></div>
+      </div>
+      <div class="item rise d3">
+        <div class="grid" style="--cell:12px; --gap:2px; --cols:12; flex:none; margin-top:6px; width:166px">
+          <!-- 4 x 12: start bottom-left, cliff along the bottom, goal bottom-right -->
+          <script>document.write(Array.from({length:48},(_,i)=>{const r=Math.floor(i/12),c=i%12;let k='';if(r===3&&c===0)k='start';else if(r===3&&c===11)k='goal';else if(r===3)k='cliff';return `<div class="c ${k}"></div>`}).join(''))</script>
+        </div>
+        <div style="margin-left:10px"><h3>Cliff Walking</h3><p>−1 per step, −100 for falling off the cliff (Sutton &amp; Barto).</p></div>
+      </div>
+    </div>
+    <div class="panel rise d2" style="flex:1">
+      <h3 style="font-size:22px; margin-bottom:22px">How we score every run</h3>
+      <div class="col" style="gap:24px">
+        <div class="item"><div class="icon" style="background:var(--sarsa)"><svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg></div>
+          <div><h3>Model-free agents</h3><p>They only call <code>reset()</code> and <code>step()</code>, never the model.</p></div></div>
+        <div class="item"><div class="icon" style="background:var(--q)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6"/></svg></div>
+          <div><h3>Exact regret</h3><p>V*(s₀) − V<sup>π</sup>(s₀), with Q* from value iteration. 0 means truly optimal.</p></div></div>
+        <div class="item"><div class="icon" style="background:var(--exp)"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 15h.01M15 9h.01M9 15h.01"/></svg></div>
+          <div><h3>20 seeds each</h3><p>We report the spread, not one lucky run.</p></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>Tabular RL · Assignment 1</span><span></span></div>
+  <aside class="notes">(~35 s) Three environments: the class grid, the same grid with slippery 80/10/10 moves, and Cliff Walking from Sutton &amp; Barto. The agents never see the transition model, they only play. But we do know the model, so we compute the true optimum with value iteration and grade every learned policy exactly: <b>regret</b> is how much value the greedy policy loses from the start. Every configuration is trained with 20 seeds.</aside>
+</section>
+
+<!-- 3 · Minimum requirement ================================================ -->
+<section class="slide">
+  <h2 class="title rise">Minimum requirement: both solve the class gridworld</h2>
+  <div class="row" style="gap:40px; align-items:flex-start">
+    <div class="figure rise d1" style="flex:none; width:820px"><img src="results/figures/exp1_values_policies.png" alt="Learned values and greedy policies of SARSA and Q-learning next to the optimal Q*"></div>
+    <div class="col" style="gap:34px; padding-top:8px">
+      <div class="stat rise d2"><div class="big" style="color:var(--exp)">20 / 20</div><div class="cap">seeds optimal for both on the deterministic grid</div></div>
+      <div class="stat rise d3"><div class="big" style="color:var(--q)">19 <span style="font-size:30px; color:var(--muted)">vs</span> 15</div><div class="cap">Q-learning vs SARSA, slippery grid, default settings</div></div>
+      <div class="stat rise d4"><div class="big" style="color:var(--sarsa)">20 / 20</div><div class="cap">both, once ε → 0 and α shrinks with the visits</div></div>
+    </div>
+  </div>
+  <div class="footer"><span>Tabular RL · Assignment 1</span><span></span></div>
+  <aside class="notes">(~50 s) Left: the true optimal values and policy, then what SARSA and Q-learning learned. Deterministic: both find the optimal path in all 20 seeds. Slippery: the optimum changes, next to the pit it is better to walk away from it. With default settings Q-learning gets 19 of 20 seeds right but SARSA only 15: <b>SARSA learns the value of its own exploring policy</b>, so its values near the pit are lower. When exploration fades to zero and the step size shrinks with the visits (the theory's convergence conditions) both get 20 of 20.</aside>
+</section>
+
+<!-- 4 · Cliff ================================================================ -->
+<section class="slide">
+  <h2 class="title rise">On-policy vs off-policy: the cliff</h2>
+  <div class="row" style="gap:36px; align-items:flex-start">
+    <div class="figure rise d1" style="flex:none; width:800px"><img src="results/figures/exp3_cliff_walking.png" alt="SARSA learns a safe path, Q-learning the edge path"></div>
+    <div class="col" style="gap:20px; flex:1">
+      <div class="card rise d2">
+        <div class="item" style="align-items:center; margin-bottom:12px"><div class="icon" style="background:var(--sarsa); width:44px; height:44px"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></div><h3 style="font-size:22px; color:var(--sarsa)">SARSA</h3></div>
+        <p style="font-size:16px; line-height:1.7">Safe path · 17 steps<br>Return while exploring <b>−25.8</b><br>Greedy policy optimal 0 / 20</p>
+      </div>
+      <div class="card rise d3">
+        <div class="item" style="align-items:center; margin-bottom:12px"><div class="icon" style="background:var(--q); width:44px; height:44px"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3 style="font-size:22px; color:var(--q)">Q-learning</h3></div>
+        <p style="font-size:16px; line-height:1.7">Edge path · 13 steps<br>Return while exploring −51.9<br>Greedy policy optimal <b>20 / 20</b></p>
+      </div>
+      <p class="quote rise d4">SARSA learns the policy it follows, random steps included. Q-learning learns the greedy one.</p>
+    </div>
+  </div>
+  <div class="footer"><span>Tabular RL · Assignment 1</span><span></span></div>
+  <aside class="notes">(~45 s) The classic Cliff Walking result. SARSA's target uses the action it really takes next, exploration included, so it keeps a row of distance from the cliff. Q-learning's target is the max: it learns the shortest path along the edge, which is optimal, but while it is still exploring it falls more often. <b>Worse return during training, yet its greedy policy is optimal in all 20 seeds.</b></aside>
+</section>
+
+<!-- 5 · All algorithms ======================================================== -->
+<section class="slide">
+  <h2 class="title rise">Six algorithms, three environments</h2>
+  <div class="row" style="gap:44px">
+    <div class="col rise d1" style="flex:1.6">
+      <div class="chart" id="chart-all" style="height:400px"></div>
+      <div class="legend" id="legend-all" style="margin-top:46px"></div>
+    </div>
+    <div class="col" style="flex:1; gap:30px; padding-top:30px">
+      <div class="item rise d2"><div class="badge" style="background:var(--q)">1</div><div><h3>Q-learning is the most accurate</h3><p>≥ 94% optimal actions in all three environments.</p></div></div>
+      <div class="item rise d3"><div class="badge" style="background:var(--exp)">2</div><div><h3>Expected SARSA wins on-policy</h3><p>Averaging over the next action removes noise.</p></div></div>
+      <div class="item rise d4"><div class="badge" style="background:var(--mc)">3</div><div><h3>Monte Carlo fails at the cliff</h3><p>It needs episodes that end, and with a bad early policy they don't.</p></div></div>
+    </div>
+  </div>
+  <div class="footer"><span>Tabular RL · Assignment 1</span><span></span></div>
+  <aside class="notes">(~35 s) We compared six tabular methods with the same settings. The chart shows the share of states where the final greedy action is optimal. Q-learning is the most accurate in all three environments. Among the on-policy methods, Expected SARSA is the best: it averages over the next action instead of sampling it. Monte Carlo collapses in Cliff Walking: it learns from complete episodes, and with a bad early policy the episodes almost never end.</aside>
+</section>
+
+<!-- 6 · Optuna ================================================================= -->
+<section class="slide">
+  <h2 class="title rise">Optuna: tuning helps every algorithm</h2>
+  <div class="row" style="gap:40px; margin-bottom:34px">
+    <div class="stat rise d1" style="flex:1"><div class="big" style="color:var(--q)">12 / 12</div><div class="cap">studies learn significantly faster<br>(p &lt; 0.05 on 20 held-out seeds)</div></div>
+    <div class="stat rise d2" style="flex:1"><div class="big" style="color:var(--exp)">0 → 18</div><div class="cap">seeds where Expected SARSA finds<br>the optimal cliff path</div></div>
+    <div class="stat rise d3" style="flex:1"><div class="big" style="color:var(--sarsa)">8 / 10</div><div class="cap">TD settings that picked a shrinking α<br>(Robbins–Monro) on their own</div></div>
+  </div>
+  <div class="row rise d3" style="gap:48px">
+    <div class="col" style="flex:1"><div class="chart" id="chart-slip" style="height:300px"></div></div>
+    <div class="col" style="flex:1"><div class="chart" id="chart-cliff" style="height:300px"></div></div>
+  </div>
+  <div class="legend rise d4" style="margin-top:40px; justify-content:center"><span><i style="background:#b8c2d0"></i>default</span><span><i style="background:var(--q)"></i>tuned with Optuna</span><span>· mean regret during training, log scale, lower is better</span></div>
+  <aside class="notes">(~50 s) We tuned all six algorithms in both hard environments with Optuna: 12 studies, 150 trials each, with two goals at once, <b>learn fast and end up exactly optimal</b>. Then we retrained the default and the tuned settings on 20 new seeds. All 12 learn significantly faster. Expected SARSA goes from never finding the optimal cliff path to 18 of 20 seeds. And the nice part: in 8 of 10 cases Optuna picked a step size that shrinks with the visits and exploration that fades to zero. It rediscovered the convergence conditions from theory.</aside>
+</section>
+
+<!-- 7 · Training lessons ======================================================== -->
+<section class="slide">
+  <h2 class="title rise">What makes training work</h2>
+  <div class="row" style="gap:24px; margin-bottom:26px">
+    <div class="card rise d1" style="flex:1">
+      <div class="item" style="align-items:center; margin-bottom:12px"><div class="icon" style="background:var(--exp)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></div><h3>Explore, then stop</h3></div>
+      <p style="font-size:16px; color:var(--muted); line-height:1.45">On-policy methods only reach the optimum when ε → 0 (GLIE).</p>
+    </div>
+    <div class="card rise d2" style="flex:1">
+      <div class="item" style="align-items:center; margin-bottom:12px"><div class="icon" style="background:var(--sarsa)"><svg viewBox="0 0 24 24"><path d="M4 18h4v-4h4v-4h4V6h4"/></svg></div><h3>Shrink the steps</h3></div>
+      <p style="font-size:16px; color:var(--muted); line-height:1.45">α / (1 + k·N(s,a)) lets the values settle even with random moves.</p>
+    </div>
+    <div class="card rise d3" style="flex:1">
+      <div class="item" style="align-items:center; margin-bottom:12px"><div class="icon" style="background:var(--q)"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg></div><h3>Forget bad early returns</h3></div>
+      <p style="font-size:16px; color:var(--muted); line-height:1.45">MC with 1/N got stuck at −100 in 14/20 seeds. A constant α: 0/20.</p>
+    </div>
+  </div>
+  <div class="figure rise d4" style="width:960px; margin:0 auto"><img src="results/figures/exp6_failure_analysis.png" alt="Per-seed returns in Cliff Walking and Double Q estimates collapsing to the -100 plateau"></div>
+  <aside class="notes">(~40 s) Three lessons about training. Exploration must fade out for on-policy methods to become optimal. The step size should shrink with the visits so the values can settle despite random moves. And the cliff taught us the last one: a policy that never reaches the goal is worth −100. <b>Monte Carlo averaging every return ever seen keeps the terrible first episodes forever</b> and gets stuck there in 14 of 20 seeds; with a constant step size it forgets them and none gets stuck. The red lines on the right are Double Q seeds stuck at that same −100.</aside>
+</section>
+
+<!-- 8 · Takeaways =============================================================== -->
+<section class="slide dark">
+  <h2 class="title rise">Takeaways</h2>
+  <div class="row" style="gap:60px; align-items:center">
+    <div class="col" style="flex:1.4; gap:28px">
+      <div class="item rise d1" style="align-items:center"><div class="badge" style="background:var(--exp); width:52px; height:52px">1</div><p style="font-size:21px; color:#fff">SARSA and Q-learning both solve the class gridworld, deterministic and slippery</p></div>
+      <div class="item rise d2" style="align-items:center"><div class="badge" style="background:var(--q); width:52px; height:52px">2</div><p style="font-size:21px; color:#fff">Q-learning learns the optimum; SARSA learns the policy it follows, so it plays safe</p></div>
+      <div class="item rise d3" style="align-items:center"><div class="badge" style="background:var(--sarsa); width:52px; height:52px">3</div><p style="font-size:21px; color:#fff">Convergence needs ε → 0 and a shrinking α, and Optuna found exactly that</p></div>
+      <div class="item rise d4" style="align-items:center"><div class="badge" style="background:var(--dq); width:52px; height:52px">4</div><p style="font-size:21px; color:#fff">Fully reproducible: seeded runs, one command redraws everything</p></div>
+    </div>
+    <div class="col rise d3" style="flex:1; align-items:center">
+      <div class="grid" style="--cell:84px; --gap:10px; --step:94px; position:relative">
+        <div class="c"></div><div class="c"></div><div class="c"></div><div class="c goal">+1</div>
+        <div class="c"></div><div class="c wall"></div><div class="c"></div><div class="c pit">−1</div>
+        <div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div>
+        <div class="agent walk" style="--cell:84px; --step:94px"></div>
+      </div>
+      <p style="font-family:var(--head); font-size:34px; font-weight:700; margin-top:28px">Questions?</p>
+      <p style="font-size:14px; color:#8a9bb5; margin-top:6px">github.com/ElTiToRuiz/assignment-1</p>
+    </div>
+  </div>
+  <aside class="notes">(~20 s) To sum up: both algorithms solve the gridworld; Q-learning learns the optimum while SARSA learns the policy it actually follows and plays safe; convergence needs exploration and step sizes that fade, which is what Optuna chose; and everything is reproducible from the repository. Thank you, questions?</aside>
+</section>
+
+<!-- Backup ======================================================================== -->
+<section class="slide dark">
+  <div class="col" style="height:100%; justify-content:center; align-items:center; gap:18px">
+    <div class="kicker rise">for the questions</div>
+    <h2 class="rise d1" style="font-size:64px">Backup</h2>
+    <div class="grid rise d2" style="--cell:46px; --gap:8px; margin-top:20px">
+      <div class="c"></div><div class="c"></div><div class="c"></div><div class="c goal"></div>
+      <div class="c"></div><div class="c wall"></div><div class="c"></div><div class="c pit"></div>
+      <div class="c start"></div><div class="c"></div><div class="c"></div><div class="c"></div>
+    </div>
+  </div>
+  <aside class="notes">Backup slides: dynamic programming, convergence conditions, Monte Carlo vs TD, Optuna details.</aside>
+</section>
+
+<section class="slide">
+  <h2 class="title rise">Dynamic programming: the answer key</h2>
+  <div class="row" style="gap:48px; align-items:flex-start">
+    <div class="rise d1" style="flex:1.2">
+      <table class="t">
+        <tr><th>Environment</th><th>Value iteration<br><span style="font-weight:400; font-size:14px">sweeps</span></th><th>Policy iteration<br><span style="font-weight:400; font-size:14px">steps</span></th></tr>
+        <tr><td>Deterministic grid</td><td>6</td><td>6</td></tr>
+        <tr><td>Slippery grid</td><td class="hl">145</td><td class="hl">7</td></tr>
+        <tr><td>Cliff Walking</td><td>15</td><td>15</td></tr>
+      </table>
+    </div>
+    <div class="col" style="flex:1; gap:26px">
+      <div class="item rise d2"><div class="badge" style="background:var(--sarsa)">1</div><div><h3>Value iteration</h3><p>Applies the Bellman optimality equation until V stops changing: cheap sweeps, many of them.</p></div></div>
+      <div class="item rise d3"><div class="badge" style="background:var(--q)">2</div><div><h3>Policy iteration</h3><p>Solves the Bellman equation exactly, then improves greedily: few, expensive steps.</p></div></div>
+      <div class="item rise d4"><div class="badge" style="background:var(--exp)">3</div><div><h3>Same V*</h3><p>Both agree. It is only used to grade the agents, who never see P.</p></div></div>
+    </div>
+  </div>
+  <div class="footer"><span>Tabular RL · Backup</span><span></span></div>
+  <aside class="notes">Value iteration needs 145 sweeps in the slippery grid because it only converges asymptotically; policy iteration needs 7 because each step evaluates the policy exactly by solving a linear system.</aside>
+</section>
+
+<section class="slide">
+  <h2 class="title rise">Convergence conditions in the slippery grid</h2>
+  <div class="figure rise d1"><img src="results/figures/exp1_convergent_schedule.png" alt="Default schedule vs GLIE plus Robbins-Monro"></div>
+  <p class="rise d2" style="font-size:18px; color:var(--muted); margin-top:26px; line-height:1.5">Dashed: default (ε ≥ 0.05, constant α). Solid: ε → 0 and α = 0.5 / (1 + 0.005·N). Both reach <b style="color:var(--ink)">20 / 20 seeds</b>; SARSA needs about 15× more episodes than Q-learning.</p>
+  <div class="footer"><span>Tabular RL · Backup</span><span></span></div>
+  <aside class="notes">GLIE: greedy in the limit with infinite exploration. Robbins–Monro: the sum of the steps is infinite and the sum of their squares is finite.</aside>
+</section>
+
+<section class="slide">
+  <h2 class="title rise">Monte Carlo vs TD, and how much to explore</h2>
+  <div class="row" style="gap:24px; margin-bottom:22px">
+    <div class="figure rise d1" style="flex:1"><img src="results/figures/exp5c_bias_variance.png" alt="Bias and variance of Monte Carlo vs TD"></div>
+    <div class="figure rise d2" style="flex:1"><img src="results/figures/exp5a_alpha_sensitivity.png" alt="Learning-rate sensitivity"></div>
+  </div>
+  <div class="figure rise d3" style="width:940px; margin:0 auto"><img src="results/figures/exp5b_exploration.png" alt="Exploration schedules"></div>
+  <div class="footer"><span>Tabular RL · Backup</span><span></span></div>
+  <aside class="notes">Monte Carlo targets real returns: unbiased but noisy. TD bootstraps from its own estimates: biased early on, but steadier. Too small an α learns slowly, too large an α chases noise. Decaying ε gets good behaviour now and good knowledge later.</aside>
+</section>
+
+<section class="slide">
+  <h2 class="title rise">Optuna: Pareto fronts and what matters</h2>
+  <div class="figure rise d1" style="width:940px; margin:0 auto 20px"><img src="results/figures/exp4_pareto.png" alt="Every Optuna trial on the speed and exactness plane"></div>
+  <div class="row" style="gap:30px; align-items:center">
+    <div class="figure rise d2" style="flex:none; width:420px"><img src="results/figures/exp4_param_importance.png" alt="Parameter importance"></div>
+    <p class="rise d3" style="font-size:18px; color:var(--muted); line-height:1.5">Two goals at once: learn fast and end exactly optimal. We keep the Pareto front and pick the point with the smallest sum. Trial 0 (the square) is always the default.</p>
+  </div>
+  <div class="footer"><span>Tabular RL · Backup</span><span></span></div>
+  <aside class="notes">TPE models which hyper-parameters gave good vs bad trials and proposes new ones where the good ones concentrate. Tuned on 5 seeds, compared on 20 different ones, like a train/test split.</aside>
+</section>
+
+</div>
+
+<div id="counter"></div>
+<div id="help">← → to move · <kbd>N</kbd> notes · <kbd>F</kbd> full screen</div>
+<div id="notes"></div>
+
+<script>
+// ------------------------------------------------------------------ charts (data from results/tables/)
+const COL = { "Monte Carlo": "var(--mc)", "SARSA": "var(--sarsa)", "n-step SARSA": "var(--nstep)",
+              "Expected SARSA": "var(--exp)", "Q-learning": "var(--q)", "Double Q-learning": "var(--dq)" };
+
+function barChart(el, { title, groups, series, min, max, log, ticks, fmt }) {
+  const pos = v => log ? (Math.log10(v) - Math.log10(min)) / (Math.log10(max) - Math.log10(min))
+                       : (v - min) / (max - min);
+  let html = title ? `<div class="ctitle">${title}</div>` : "";
+  html += `<div class="plot" style="height:calc(100% - ${title ? 32 : 0}px)">`;
+  for (const t of ticks) html += `<div class="tick" style="bottom:${pos(t) * 100}%"><span>${fmt(t)}</span></div>`;
+  groups.forEach((g, gi) => {
+    html += `<div class="group">`;
+    series.forEach((s, si) => {
+      const v = s.values[gi];
+      html += `<div class="bar" style="height:${Math.max(pos(v), 0.004) * 100}%; background:${s.color}; transition-delay:${0.05 * si + 0.1 * gi}s" data-v="${s.name}: ${fmt(v)}"></div>`;
+    });
+    html += `<div class="label">${g}</div></div>`;
+  });
+  el.innerHTML = html + "</div>";
+}
+
+const pct = v => `${Math.round(v)}%`;
+barChart(document.getElementById("chart-all"), {
+  title: "States where the final greedy action is optimal",
+  groups: ["Deterministic grid", "Slippery grid", "Cliff Walking"],
+  series: [
+    { name: "Monte Carlo", values: [80.6, 72.8, 41.2] },
+    { name: "SARSA", values: [81.1, 85.0, 56.4] },
+    { name: "n-step SARSA", values: [80.0, 76.1, 59.1] },
+    { name: "Expected SARSA", values: [82.2, 87.2, 74.7] },
+    { name: "Q-learning", values: [94.4, 97.8, 95.4] },
+    { name: "Double Q-learning", values: [95.0, 88.9, 67.8] },
+  ].map(s => ({ ...s, color: COL[s.name] })),
+  min: 0, max: 100, ticks: [0, 25, 50, 75, 100], fmt: pct,
+});
+document.getElementById("legend-all").innerHTML =
+  Object.entries(COL).map(([n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join("");
+
+const short = ["SARSA", "Exp. SARSA", "Q-learn.", "Double Q", "n-step", "MC α"];
+const num = v => v >= 1 ? v.toFixed(1) : v >= 0.01 ? v.toFixed(2) : v.toFixed(3);
+barChart(document.getElementById("chart-slip"), {
+  title: "Slippery grid", groups: short, log: true, min: 0.001, max: 1, ticks: [0.001, 0.01, 0.1, 1], fmt: num,
+  series: [
+    { name: "default", color: "#b8c2d0", values: [0.0689, 0.0343, 0.0101, 0.0729, 0.1829, 0.4004] },
+    { name: "tuned", color: "var(--q)", values: [0.0396, 0.0197, 0.0028, 0.0158, 0.0319, 0.0455] },
+  ],
+});
+barChart(document.getElementById("chart-cliff"), {
+  title: "Cliff Walking", groups: short, log: true, min: 0.01, max: 10, ticks: [0.01, 0.1, 1, 10], fmt: num,
+  series: [
+    { name: "default", color: "#b8c2d0", values: [2.3933, 0.8601, 0.5895, 3.5263, 2.6814, 2.7989] },
+    { name: "tuned", color: "var(--q)", values: [0.8955, 0.5447, 0.0865, 0.6735, 0.5342, 1.8235] },
+  ],
+});
+
+// ------------------------------------------------------------------ navigation
+const stage = document.getElementById("stage");
+const slides = [...document.querySelectorAll(".slide")];
+const notesBox = document.getElementById("notes");
+let current = 0;
+
+function fit() {
+  const s = Math.min(innerWidth / 1280, innerHeight / 720) * 0.96;
+  stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+
+function show(i) {
+  current = Math.max(0, Math.min(slides.length - 1, i));
+  slides.forEach((s, k) => {
+    s.classList.toggle("active", k === current);
+    s.classList.toggle("before", k < current);
+    const num = s.querySelector(".footer span:last-child");
+    if (num) num.textContent = k + 1;
+  });
+  document.getElementById("counter").textContent = `${current + 1} / ${slides.length}`;
+  document.getElementById("progress").style.width = `${(current + 1) / slides.length * 100}%`;
+  const n = slides[current].querySelector("aside.notes");
+  notesBox.innerHTML = n ? n.innerHTML : "";
+  history.replaceState(null, "", `#${current + 1}`);
+}
+
+addEventListener("keydown", e => {
+  if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); show(current + 1); }
+  else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); show(current - 1); }
+  else if (e.key === "Home") show(0);
+  else if (e.key === "End") show(slides.length - 1);
+  else if (e.key.toLowerCase() === "n") notesBox.classList.toggle("show");
+  else if (e.key.toLowerCase() === "f") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+});
+addEventListener("click", e => {
+  if (e.target.closest("#notes")) return;
+  show(current + (e.clientX > innerWidth / 3 ? 1 : -1));
+});
+addEventListener("resize", fit);
+setTimeout(() => document.getElementById("help").style.opacity = 0, 6000);
+
+fit();
+show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+</script>
+</body>
+</html>

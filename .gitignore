@@ -2,7 +2,6 @@
 .venv/
 __pycache__/
 *.pyc
-.pytest_cache/
 .DS_Store
 # training cache: rebuilt by run_all (training is deterministic, so it gives the same numbers)
 results/cache/
