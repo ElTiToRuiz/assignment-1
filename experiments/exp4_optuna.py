@@ -86,9 +86,9 @@ def pareto_figure(studies, envs, algos):
             for axis in (ax.xaxis, ax.yaxis):
                 axis.set_minor_formatter(NullFormatter())
             if i == len(envs) - 1:
-                ax.set_xlabel("speed: mean regret (0 at 1e-5)")
+                ax.set_xlabel(r"speed: mean regret (0 at $10^{-5}$)")
             if j == 0:
-                ax.set_ylabel("exactness: final regret (0 at 1e-5)")
+                ax.set_ylabel(r"exactness: final regret (0 at $10^{-5}$)")
     axes[0, 0].legend(fontsize=7, loc="lower right")
     fig.suptitle("Optuna multi-objective search (TPE): every trial, Pareto front, default and chosen configuration")
     save(fig, "exp4_pareto.png")
@@ -150,7 +150,7 @@ def comparison(studies, envs, algos):
                 ax.set(title=f"{ENV_NAMES[env]}: mean regret on 20 held-out seeds (95% CI)",
                        ylabel="normalised regret (lower = faster)")
             else:
-                ax.set(ylim=(0, 105), title="Seeds whose final greedy policy is exactly π*", ylabel="% of seeds")
+                ax.set(ylim=(0, 105), title=r"Seeds whose final greedy policy is exactly $\pi^*$", ylabel="% of seeds")
             ax.legend(loc="upper left")
     fig.suptitle("Default vs Optuna-tuned hyper-parameters (permutation test: * p<0.05, ** p<0.01, *** p<0.001)")
     save(fig, "exp4_default_vs_tuned.png")

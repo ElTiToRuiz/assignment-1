@@ -35,9 +35,9 @@ def main():
         plot_band(ax1, moving_average(o["returns"], 20), a, COLORS[a], robust=True)
         plot_band(ax2, o["regret"], a, COLORS[a], x=snap_x(o), robust=True, floor=1e-3)
     ax1.set(ylim=(-120, 0), xlabel="episode", ylabel="return",
-            title=f"Online return while exploring (eps={CONFIG['cliff_walking']['eps'][0]})\nSARSA is better: it avoids the edge")
-    ax2.set(yscale="log", xlabel="episode", ylabel="regret (0 drawn at 1e-3)",
-            title="Regret of the greedy (eps=0) policy\nQ-learning is better: it learns the optimal path")
+            title=rf"Online return while exploring ($\varepsilon={CONFIG['cliff_walking']['eps'][0]}$)" + "\nSARSA is better: it avoids the edge")
+    ax2.set(yscale="log", xlabel="episode", ylabel=r"regret (0 drawn at $10^{-3}$)",
+            title=r"Regret of the greedy ($\varepsilon=0$) policy" + "\nQ-learning is better: it learns the optimal path")
     ax1.legend(); ax2.legend()
     fig.suptitle("Cliff Walking: on-policy (SARSA) vs off-policy (Q-learning)")
     save(fig, "exp3_cliff_walking.png")

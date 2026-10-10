@@ -15,7 +15,7 @@ from .common import ALGOS, ENVS, save_table, summary_row, train_default
 def bars_figure(all_outs):
     """Where every algorithm ends after training, all environments side by side."""
     metrics = [("match", "Optimal greedy actions (%)", 100, False),
-               ("regret", "Regret of greedy policy at s0", 1, True),
+               ("regret", r"Regret of the greedy policy at $s_0$", 1, True),
                ("rmse_opt", "RMSE of Q on optimal actions", 1, True)]
     fig, axes = plt.subplots(1, 3, figsize=(18, 5.2), layout="constrained")
     w = 0.8 / len(ALGOS)

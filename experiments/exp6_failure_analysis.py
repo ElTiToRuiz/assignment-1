@@ -61,8 +61,9 @@ def main():
                      "greedy regret (median seed)": round(abs(float(np.median(o["regret"][:, -1]))), 2),
                      "seeds with optimal greedy policy": f"{int((o['regret'][:, -1] < 1e-6).sum())}/{len(bad)}"})
     ax[0].set_yscale("log")
-    ticks = ["Monte Carlo\n1/N (class)", "MC\nconstant α=0.1", "MC α=0.1\n+ exploring starts", "Double Q\nα=0.5",
-             "Double Q\nα=0.1", "SARSA α=0.5\n(reference)", "Q-learning α=0.5\n(reference)"]
+    ticks = ["Monte Carlo\n$1/N$ (class)", "MC\nconstant $\\alpha=0.1$", "MC $\\alpha=0.1$\n+ exploring starts",
+             "Double Q\n$\\alpha=0.5$", "Double Q\n$\\alpha=0.1$", "SARSA $\\alpha=0.5$\n(reference)",
+             "Q-learning $\\alpha=0.5$\n(reference)"]
     ax[0].set_xticks(range(len(VARIANTS)), ticks, fontsize=9)
     ax[0].set(ylabel="cost = −return (log, lower is better)",
               title="Per-seed online return, last 100 episodes  (✕ = stuck in loops, bar = median)")
@@ -74,12 +75,12 @@ def main():
         ax[1].plot(snap_x(o), q, color="#b2182b" if b else COLORS["Double Q-learning"], lw=1.6 if b else .8,
                    alpha=.95 if b else .5)
     ax[1].axhline(plateau, ls="--", color="black", lw=1)
-    ax[1].text(snap_x(o)[-1], plateau + 3, "−1/(1−γ) = −100: value of never reaching the goal", ha="right", fontsize=9)
+    ax[1].text(snap_x(o)[-1], plateau + 3, r"$-1/(1-\gamma) = -100$: value of never reaching the goal", ha="right", fontsize=9)
     ax[1].axhline(o["Q_star"][spec.start_state].max(), ls=":", color="green", lw=1.2)
-    ax[1].text(snap_x(o)[-1], o["Q_star"][spec.start_state].max() + 3, "Q*(s0, a*)", ha="right", fontsize=9, color="green")
-    ax[1].set(xlabel="episode", ylabel="Q(s0, a*)", ylim=(-130, 0),
-              title=f"Double Q α=0.5: Q at the start state per seed (red = the {int(bad.sum())} stuck seeds)")
-    fig.suptitle("Cliff Walking failure analysis: estimates collapse to the −100 'never arrive' plateau")
+    ax[1].text(snap_x(o)[-1], o["Q_star"][spec.start_state].max() + 3, r"$Q^*(s_0, a^*)$", ha="right", fontsize=9, color="green")
+    ax[1].set(xlabel="episode", ylabel=r"$Q(s_0, a^*)$", ylim=(-130, 0),
+              title=rf"Double Q $\alpha=0.5$: $Q$ at the start state per seed (red = the {int(bad.sum())} stuck seeds)")
+    fig.suptitle(r"Cliff Walking failure analysis: estimates collapse to the $-100$ 'never arrive' plateau")
     save(fig, "exp6_failure_analysis.png")
     save_table(pd.DataFrame(rows), "exp6_failure_analysis")
 

@@ -31,18 +31,18 @@ def alpha_sensitivity():
         fin = np.array([o["rmse_opt"][:, -1] for o in outs])
         for a_, v in [(ax[0], auc), (ax[1], fin)]:
             a_.errorbar(alphas, v.mean(1), v.std(1), label=algo, color=COLORS[algo], marker="o", capsize=3, lw=1.8)
-    ax[0].set(xscale="log", xlabel="alpha", ylabel="mean regret", title="Speed: mean regret during training")
-    ax[1].set(xscale="log", yscale="log", xlabel="alpha", ylabel="RMSE",
-              title="Accuracy: final RMSE of Q on optimal actions")
+    ax[0].set(xscale="log", xlabel=r"$\alpha$", ylabel="mean regret", title="Speed: mean regret during training")
+    ax[1].set(xscale="log", yscale="log", xlabel=r"$\alpha$", ylabel="RMSE",
+              title=r"Accuracy: final RMSE of $Q$ on optimal actions")
     ax[0].legend()
-    fig.suptitle("Learning-rate sensitivity (slippery gridworld, 10 seeds): too small = slow, too large = noisy")
+    fig.suptitle(r"Learning-rate sensitivity $\alpha$ (slippery gridworld, 10 seeds): too small = slow, too large = noisy")
     save(fig, "exp5a_alpha_sensitivity.png")
 
 
 def exploration():
     """Exploring more means worse returns now but better knowledge later. Decaying eps gets both."""
-    schedules = {"constant ε=0.01": (0.01, 0.01, 1.0), "constant ε=0.1": (0.1, 0.1, 1.0),
-                 "constant ε=0.3": (0.3, 0.3, 1.0), "decay 1 → 0.05": (1.0, 0.05, 0.998)}
+    schedules = {r"constant $\varepsilon=0.01$": (0.01, 0.01, 1.0), r"constant $\varepsilon=0.1$": (0.1, 0.1, 1.0),
+                 r"constant $\varepsilon=0.3$": (0.3, 0.3, 1.0), r"decay $1 \to 0.05$": (1.0, 0.05, 0.998)}
     cmap = plt.get_cmap("plasma")
     fig, ax = plt.subplots(1, 3, figsize=(17, 4.5), layout="constrained")
     for k, (name, sch) in enumerate(schedules.items()):
@@ -57,7 +57,7 @@ def exploration():
     for a_ in ax:
         a_.set_xlabel("episode")
     ax[0].legend()
-    fig.suptitle("Exploration–exploitation trade-off: Q-learning with different ε schedules (slippery gridworld)")
+    fig.suptitle(r"Exploration–exploitation trade-off: Q-learning with different $\varepsilon$ schedules (slippery gridworld)")
     save(fig, "exp5b_exploration.png")
 
 
@@ -73,10 +73,10 @@ def bias_variance():
         ax[0].plot(snap_x(o), q.mean(0) - target, label=algo, color=COLORS[algo], lw=1.8)
         ax[1].plot(snap_x(o), q.std(0), label=algo, color=COLORS[algo], lw=1.8)
     ax[0].axhline(0, color="black", lw=.8)
-    ax[0].set(xlabel="episode", title="Bias: mean over seeds of Q(s0,a*) − Q*(s0,a*)")
-    ax[1].set(xlabel="episode", yscale="log", title="Variance: std over seeds of Q(s0,a*)")
+    ax[0].set(xlabel="episode", title=r"Bias: mean over seeds of $Q(s_0,a^*) - Q^*(s_0,a^*)$")
+    ax[1].set(xlabel="episode", yscale="log", title=r"Variance: std over seeds of $Q(s_0,a^*)$")
     ax[0].legend()
-    fig.suptitle("Monte Carlo vs TD (30 seeds, constant ε=0.2): MC targets the ε-greedy return, TD bootstraps")
+    fig.suptitle(r"Monte Carlo vs TD (30 seeds, constant $\varepsilon=0.2$): MC targets the $\varepsilon$-greedy return, TD bootstraps")
     save(fig, "exp5c_bias_variance.png")
 
 
