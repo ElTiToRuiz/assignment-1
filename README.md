@@ -9,8 +9,6 @@ Este repositorio es nuestra entrega del assignment de RL tabular. El mínimo que
 - ajustamos los hiperparámetros con **Optuna** (12 estudios, 150 pruebas cada uno);
 - analizamos el propio entrenamiento: tasa de aprendizaje, exploración, sesgo/varianza de MC frente a TD y por qué algunos métodos se atascan.
 
-La presentación de 5 minutos está en [`presentation.html`](presentation.html). Se abre en el navegador; con las flechas se avanza, con `N` se ven las notas y con `F` se pone a pantalla completa.
-
 ---
 
 ## Cómo ponerlo en marcha
@@ -68,7 +66,6 @@ El entrenamiento usa semillas fijas, así que cada ejecución da **exactamente l
 | `figures/`, `tables/` | Todas las figuras y tablas de este README y de la presentación |
 | `models/` | Las tablas Q finales del gridworld, una por algoritmo (las usa la demo) |
 | `optuna/studies.db` | Los 12 estudios de Optuna. Fue una hora de cálculo en otro ordenador, así que lo guardamos |
-| **`presentation.html`** | **La presentación de 5 minutos, con diapositivas extra para las preguntas** |
 
 ---
 

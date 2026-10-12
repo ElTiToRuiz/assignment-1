@@ -5,3 +5,10 @@ __pycache__/
 .DS_Store
 # training cache: rebuilt by run_all (training is deterministic, so it gives the same numbers)
 results/cache/
+
+# no es código: presentación, docs, tests, exportados
+presentation.html
+docs/
+tests/
+*.pptx
+*.pdf
